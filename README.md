@@ -1,20 +1,29 @@
 # Zacca.ai Credit Intelligence API — decentralized, x402 on Hedera
 
-Pay-per-query credit scoring and stablecoin lending for African MSMEs, settled
-on Hedera testnet. Submission for the Hedera x402 bounty ("Build the internet's
-payment layer").
+Pay-per-query credit scoring and stablecoin lending for GenZ freelancers, gig
+workers, and crypto-native earners — people who already get paid in stablecoins,
+already pay for utilities and online purchases in crypto, and have a real
+income history that just doesn't live inside a legacy credit bureau. Settled
+on Hedera testnet. Submission for the Hedera x402 bounty ("Build the
+internet's payment layer").
 
 This is a real Zacca.ai product component, not a bounty-only demo, and this is
-the full submission, not a stripped-down version of it: bureau (VBR) lookups,
-payment/fintech statement evidence, DCS scoring, and credit-limit decisioning
-are all decentralized onto real smart contracts on Hedera testnet, with DCS
-scoring run through an ICM-structured reasoning pipeline that writes its
-result on-chain, and a `CreditLine` contract that reads that attestation and
-disburses real (testnet) stablecoin against it. An agent — a lender's
-underwriting agent, a borrower-facing app, or any autonomous buyer — pays per
-call in HBAR and gets back a Dynamic Credit Score, a VBR check, or a full
-risk/credit-limit assessment backed by verifiable on-chain state, not a
-centralized backend's say-so.
+the full submission, not a stripped-down version of it: verified-record (VBR)
+lookups, payment/fintech statement evidence, DCS scoring, and credit-limit
+decisioning are all decentralized onto real smart contracts on Hedera testnet,
+with DCS scoring run through an ICM-structured reasoning pipeline that writes
+its result on-chain, and a `CreditLine` contract that reads that attestation
+and disburses real (testnet) stablecoin against it. An agent — a lender's
+underwriting agent, a BNPL checkout, a gig-platform payout app, or any
+autonomous buyer — pays per call in HBAR and gets back a Dynamic Credit Score,
+a VBR check, or a full risk/credit-limit assessment backed by verifiable
+on-chain state, not a centralized backend's say-so.
+
+The core insight: a freelancer or gig worker already paid in USDC has a richer,
+more verifiable income signal sitting on-chain than most legacy credit files
+ever capture — Zacca's `StatementRegistry` (see "Decentralized architecture"
+below) is built to read exactly that evidence tier directly from a ledger, no
+bank statement PDF required.
 
 Forked from the Hedera bounty reference architecture
 ([matevszm/x402-hedera-example](https://github.com/matevszm/x402-hedera-example)),
@@ -30,7 +39,11 @@ pipeline, the smart contracts, the chain client — is Zacca's own.
 | `dcs-score` | `businessId` | 0.02 HBAR | Dynamic Credit Score (0-100), risk tier, and a full reasoning trace, attested on-chain |
 | `credit-limit` | `businessId` | 0.05 HBAR | full assessment: DCS, probability of default, recommended credit limit, max tenure — cross-checked against the on-chain `CreditLine` contract's own computation |
 
-`GET /catalog` returns the live catalog and pricing.
+`GET /catalog` returns the live catalog and pricing. `businessId` is just an
+opaque identifier — for this target user it's a freelancer, gig worker, or
+individual earner, not necessarily a registered company; the demo data below
+uses a single seeded example id (`biz-alice-mboga`, inherited from the
+repo's original MSME-demo naming) rather than a fresh persona-matched one.
 
 Two providers implement the same three endpoints, swappable via `DATA_PROVIDER`:
 - **`zacca-decentralized`** (default — this is the submission) — smart-contract-backed, described below.
@@ -43,7 +56,7 @@ Four smart contracts, deployed and live-exercised on Hedera testnet
 
 | Contract | Purpose |
 |---|---|
-| `VBRRegistry` | Bureau attestation registry — claim hash only, no raw bureau data |
+| `VBRRegistry` | Verified-record attestation registry (bureau file, gig-platform profile, freelance/tax registration — whatever verification exists) — claim hash only, no raw record data |
 | `StatementRegistry` | Payment/fintech statement attestation — hash + aggregate cash-flow stats |
 | `DCSRegistry` | On-chain attestation of the ICM pipeline's scoring output |
 | `CreditLine` | Reads the DCS attestation, computes the limit, disburses stablecoin (`zUSD`, a testnet `MockStablecoin`) on `draw()` |
@@ -166,13 +179,20 @@ curl -i "http://localhost:4021/data/dcs-score?businessId=biz-alice-mboga"
 
 ## Why this matters beyond the bounty
 
-Zacca.ai is repositioning from an MSME lending app to the credit intelligence
-and agentic-finance infrastructure layer that African digital credit lenders,
-SACCOs, and cross-border stablecoin fintechs (HoneyCoin, Kotani Pay, Due
-Wallet, and similar) build on. This isn't just a per-call scoring API — it's
-decentralized credit infrastructure an autonomous lender can extend stablecoin
-credit against directly, without trusting Zacca's backend for the decision.
-The bounty submission and the Q3 2026 product milestone are the same artifact.
+Zacca.ai is repositioning from a legacy-style lending app to the credit
+intelligence and agentic-finance infrastructure layer that stablecoin-native
+fintechs, BNPL providers, and gig/freelance platforms build on top of — for
+users legacy credit bureaus were never built to see. GenZ freelancers, gig
+workers, and crypto-native earners increasingly get paid, pay bills, and shop
+entirely in stablecoins (via platforms like HoneyCoin, Kotani Pay, Due Wallet,
+and similar cross-border stablecoin rails) with zero traditional credit file
+to show for it, despite having an income history that's more complete and more
+verifiable than a bank statement, because it's already sitting on a public
+ledger. This isn't just a per-call scoring API — it's decentralized credit
+infrastructure an autonomous lender, a BNPL checkout, or a gig-payout app can
+extend stablecoin credit against directly, reading that on-chain income
+signal without trusting Zacca's backend for the decision. The bounty
+submission and the Q3 2026 product milestone are the same artifact.
 
 ## Known limitations, disclosed transparently
 
