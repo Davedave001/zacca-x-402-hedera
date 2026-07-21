@@ -1,0 +1,21 @@
+{
+  "name": "zacca-credit-intelligence-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:testnet": "hardhat run scripts/deploy.ts --network hederaTestnet"
+  },
+  "license": "MIT",
+  "description": "Zacca Credit Intelligence API -- decentralized VBR/Statement/DCS attestation registries and CreditLine, implementation plan §6.",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.7",
+    "dotenv": "^17.4.2",
+    "hardhat": "^3.11.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.6.1"
+  }
+}

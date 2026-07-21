@@ -1,78 +1,159 @@
-# Zacca.ai Credit Intelligence API — x402 on Hedera
+# Zacca.ai Credit Intelligence API — decentralized, x402 on Hedera
 
-Pay-per-query credit scoring for African MSMEs, settled on Hedera testnet (HBAR).
-Submission for the Hedera x402 bounty ("Build the internet's payment layer").
+Pay-per-query credit scoring and stablecoin lending for African MSMEs, settled
+on Hedera testnet. Submission for the Hedera x402 bounty ("Build the internet's
+payment layer").
 
-This is a real Zacca.ai product component, not a bounty-only demo: the **Credit
-Intelligence API** described in Zacca's technical build outline, wired into the
-x402 resource-server pattern. An agent — a lender's underwriting agent, a
-borrower-facing app, or any autonomous buyer — pays per call in HBAR and gets
-back a Dynamic Credit Score (DCS), a Verified-Business-Record check, or a full
-risk/credit-limit assessment, with no accounts, invoices, or subscriptions.
+This is a real Zacca.ai product component, not a bounty-only demo, and this is
+the full submission, not a stripped-down version of it: bureau (VBR) lookups,
+payment/fintech statement evidence, DCS scoring, and credit-limit decisioning
+are all decentralized onto real smart contracts on Hedera testnet, with DCS
+scoring run through an ICM-structured reasoning pipeline that writes its
+result on-chain, and a `CreditLine` contract that reads that attestation and
+disburses real (testnet) stablecoin against it. An agent — a lender's
+underwriting agent, a borrower-facing app, or any autonomous buyer — pays per
+call in HBAR and gets back a Dynamic Credit Score, a VBR check, or a full
+risk/credit-limit assessment backed by verifiable on-chain state, not a
+centralized backend's say-so.
 
 Forked from the Hedera bounty reference architecture
 ([matevszm/x402-hedera-example](https://github.com/matevszm/x402-hedera-example)),
 which supplies the x402 + Hedera plumbing (Hono server, `blocky402` facilitator,
-delegated-signing client). The `DataProvider` swapped in here —
-`CreditScoreProvider` — is genuinely Zacca's own scoring logic.
+delegated-signing client). Everything else — the scoring engine, the ICM
+pipeline, the smart contracts, the chain client — is Zacca's own.
 
 ## Catalog
 
 | product | params | price | what it returns |
 |---|---|---|---|
-| `vbr-lookup` | `businessId` | 0.01 HBAR | whether the business has a Verified Business Record |
-| `dcs-score` | `businessId` | 0.02 HBAR | Dynamic Credit Score (0-100) and risk tier |
-| `credit-limit` | `businessId` | 0.05 HBAR | full assessment: DCS, probability of default, recommended credit limit, max tenure |
+| `vbr-lookup` | `businessId` | 0.01 HBAR | whether the business has a Verified Business Record, read from the on-chain `VBRRegistry` |
+| `dcs-score` | `businessId` | 0.02 HBAR | Dynamic Credit Score (0-100), risk tier, and a full reasoning trace, attested on-chain |
+| `credit-limit` | `businessId` | 0.05 HBAR | full assessment: DCS, probability of default, recommended credit limit, max tenure — cross-checked against the on-chain `CreditLine` contract's own computation |
 
 `GET /catalog` returns the live catalog and pricing.
 
-## Scoring logic — Stage 1 (cold-start, rule-based)
+Two providers implement the same three endpoints, swappable via `DATA_PROVIDER`:
+- **`zacca-decentralized`** (default — this is the submission) — smart-contract-backed, described below.
+- **`zacca-credit`** (Stage 1, kept for comparison) — the original in-process, rule-based scoring engine this repo started from; see `IMPLEMENTATION_PLAN.md` §4.
 
-`src/core/dcs-scoring.ts` implements Zacca's Stage 1 methodology from the
-original concept paper: cash-flow, stability, customer-behaviour and
-operational features combine into a 0-100 DCS score, a risk tier, and
-`Credit Limit = Monthly Turnover x Risk Multiplier`. No historical default
-data is required — this is exactly the rule-based fallback the concept paper
-specifies for a company with no loan-outcome history yet.
+## Decentralized architecture
 
-For this demo, features are deterministically derived from the `businessId`
-(same seeded-PRNG technique as the reference `MockDataProvider`) so the
-provider is self-contained and reproducible without a live data pipeline.
+Four smart contracts, deployed and live-exercised on Hedera testnet
+(`contracts/`, own Hardhat workspace — see `contracts/README.md`):
 
-**Production swap point:** replace `syntheticFeaturesFor()` in
-`dcs-scoring.ts` with a real lookup against the Zacca VBR Data Rail
-(Chat-to-Credit pipeline output). Nothing else — the provider, the catalog,
-the server wiring — needs to change. Same "swap the provider" pattern the
-reference architecture demonstrates with `MockDataProvider`.
+| Contract | Purpose |
+|---|---|
+| `VBRRegistry` | Bureau attestation registry — claim hash only, no raw bureau data |
+| `StatementRegistry` | Payment/fintech statement attestation — hash + aggregate cash-flow stats |
+| `DCSRegistry` | On-chain attestation of the ICM pipeline's scoring output |
+| `CreditLine` | Reads the DCS attestation, computes the limit, disburses stablecoin (`zUSD`, a testnet `MockStablecoin`) on `draw()` |
+
+All three registries implement one shared `IAttestationRegistry` interface
+(`attest`/`read`/`isValid`) — chain-agnostic by design: Hedera is the first
+adapter, not a hard dependency, so a Celo/Polygon/Stellar adapter is a second
+implementation of the same interface, not a rewrite.
+
+### DCS scoring — ICM-structured reasoning pipeline
+
+`src/core/icm/` replaces a single monolithic prompt with five numbered stage
+folders, each carrying its own `CONTEXT.md` (what stage it is, what inputs
+it's allowed, what it must output), orchestrated by `pipeline.ts`:
+
+```
+01-intake/        reads VBR + Statement attestations from the chain
+02-cross-check/   flags evidence-quality issues
+03-reasoning/     the LLM swap point (see below) — drafts score + rationale
+04-review/        self-critique pass before anything is finalized
+05-attest/        computes the credit limit, hashes the rationale, writes DCSRegistry
+```
+
+The stage outputs *are* the audit trail — a disputed score can be traced
+stage-by-stage instead of re-derived from one opaque completion.
+
+**LLM swap point:** `03-reasoning/reasoning-client.ts` defines a
+`ReasoningClient` interface. The current `StubReasoningClient` is a
+deterministic stand-in — no external LLM call — that reuses Zacca's existing
+risk-tier/probability-of-default bands so this path stays methodologically
+consistent with the Stage 1 engine. A real Claude-backed client drops in here
+without touching any other stage.
+
+### Why two Hedera keys
+
+x402 payment uses **ED25519** Hedera accounts (native Hedera signing). The
+smart contracts are deployed and called over Hedera's EVM JSON-RPC relay,
+which requires a separate **ECDSA (secp256k1)** key — same as any other EVM
+chain. See `contracts/README.md` for how the deployer key was generated and
+funded without a second Hedera Portal signup.
+
+## Live evidence (2026-07-21, Hedera testnet)
+
+All three endpoints were run through the full `402 -> pay -> 200` flow against
+the deployed contracts, and independently confirmed via the testnet mirror
+node (not just trusted from script output):
+
+- **`dcs-score`** for `biz-alice-mboga`: `dcs: 96`, `riskTier: "A"`, a
+  four-step rationale trace, and an on-chain `DCSRegistry` attestation
+  (tx `0xa0a915bd...`, `Attested` event confirmed).
+- **`credit-limit`**: the ICM pipeline's off-chain-computed limit matched
+  `CreditLine`'s independent on-chain computation exactly (`onChainCreditLine`
+  in the response).
+- **Stablecoin draw** (`scripts/demo-draw.ts`): borrower zUSD balance `0 -> 10`
+  after `draw()` against the attested credit line — tx `0x7acaa96b...`,
+  confirmed via mirror node. This is the actual "decentralized to enable
+  stablecoin lending" payoff: score -> approve -> fund, no centralized
+  loan-ops step, entirely against contract state.
+
+Full addresses, transaction hashes, and mirror-node confirmations are in
+`IMPLEMENTATION_PLAN.md` §6.
 
 ## Architecture
 
-- `src/core/provider.ts` — the `DataProvider` contract (unchanged from reference).
-- `src/core/dcs-scoring.ts` — **Zacca's scoring engine** (the real deliverable).
-- `src/providers/credit/credit-provider.ts` — `CreditScoreProvider`, the x402-facing wrapper.
-- `src/providers/mock/` — original reference `MockDataProvider`, kept for comparison.
-- `src/server/` — Hono app: pre-validation -> `paymentMiddleware` -> handler (unchanged).
-- `scripts/e2e-pay.ts` — live client running the full `402 -> pay -> 200` flow against `dcs-score`.
+- `src/core/provider.ts` — the `DataProvider` contract (unchanged from reference)
+- `src/core/dcs-scoring.ts` — Zacca's Stage 1 rule-based scoring engine
+- `src/core/icm/` — the ICM-structured DCS scoring pipeline (above)
+- `src/chain/` — `ethers.js` client reading/writing the deployed contracts
+- `src/providers/decentralized/` — `DecentralizedCreditProvider`, the default x402-facing wrapper
+- `src/providers/credit/` — `CreditScoreProvider`, the Stage 1 wrapper, kept for comparison
+- `src/providers/mock/` — original reference `MockDataProvider`, kept for comparison
+- `src/server/` — Hono app: pre-validation -> `paymentMiddleware` -> handler (unchanged)
+- `scripts/e2e-pay.ts` — live client running the full `402 -> pay -> 200` flow against any product (`E2E_PRODUCT`)
+- `scripts/seed-demo-business.ts` / `scripts/demo-draw.ts` — seed on-chain evidence and demo a stablecoin draw
+- `contracts/` — separate Hardhat workspace; see `contracts/README.md`
 
-Swap data source: one line in `src/providers/index.ts` (`DATA_PROVIDER=zacca-credit` vs `mock`).
+Swap data source: one line in `src/providers/index.ts` (`DATA_PROVIDER=zacca-decentralized` (default) vs `zacca-credit` vs `mock`).
 Swap facilitator: change `FACILITATOR_URL`.
 
 ## Setup
 
 Requires Node.js >=20.
 
-1. `npm install`
-2. Copy `.env.example` to `.env`; set `PAY_TO_ACCOUNT` (receiver, account id only),
-   `HEDERA_CLIENT_ID` / `HEDERA_CLIENT_KEY` (funded testnet payer account).
-   **`PAY_TO_ACCOUNT` must be a different account than `HEDERA_CLIENT_ID`** — a
-   Hedera `TransferTransaction` nets same-account transfers to zero, so paying
-   yourself settles as a 0-amount transfer and the facilitator rejects it as
-   an amount mismatch.
+### API server (root)
 
-### API server
-- `npm run dev` — start with hot reload on `http://localhost:4021`.
-- `npm test` — offline contract/unit tests (scoring determinism + provider contract).
-- `npm run e2e` — real paid request through `blocky402` on Hedera testnet.
+1. `npm install`
+2. Copy `.env.example` to `.env`:
+   - `PAY_TO_ACCOUNT` (receiver, account id only), `HEDERA_CLIENT_ID` / `HEDERA_CLIENT_KEY` (funded ED25519 testnet payer account). **`PAY_TO_ACCOUNT` must be a different account than `HEDERA_CLIENT_ID`** — a Hedera `TransferTransaction` nets same-account transfers to zero, so paying yourself settles as a 0-amount transfer and the facilitator rejects it as an amount mismatch.
+   - `HEDERA_TESTNET_DEPLOYER_KEY` (ECDSA — see `contracts/README.md`) and `HEDERA_JSON_RPC_URL`, needed by `zacca-decentralized` to read/write the contracts.
+3. `npm run dev` — start with hot reload on `http://localhost:4021`.
+4. `npm test` — offline unit tests (scoring determinism, provider contract, ICM pipeline stages).
+5. `npm run e2e` — real paid request through `blocky402` on Hedera testnet (`E2E_PRODUCT=vbr-lookup|dcs-score|credit-limit`).
+
+### Contracts (`contracts/`)
+
+See `contracts/README.md` for the full walkthrough. Short version:
+
+```bash
+cd contracts
+npm install
+npm test                # 14 unit tests
+npm run deploy:testnet  # writes deployments/hederaTestnet.json
+```
+
+### Seeding demo data
+
+```bash
+npx tsx scripts/seed-demo-business.ts   # attests VBR + Statement for biz-alice-mboga, links a CreditLine wallet
+npx tsx scripts/demo-draw.ts            # draws zUSD against the attested credit line
+```
 
 ## Example flow
 
@@ -87,16 +168,29 @@ curl -i "http://localhost:4021/data/dcs-score?businessId=biz-alice-mboga"
 
 Zacca.ai is repositioning from an MSME lending app to the credit intelligence
 and agentic-finance infrastructure layer that African digital credit lenders,
-SACCOs and banks build on. This provider is the first working piece of that
-infrastructure: a per-call, agent-payable Credit Intelligence API, live on
-Hedera rails. The bounty submission and the Q3 2026 product milestone are the
-same artifact.
+SACCOs, and cross-border stablecoin fintechs (HoneyCoin, Kotani Pay, Due
+Wallet, and similar) build on. This isn't just a per-call scoring API — it's
+decentralized credit infrastructure an autonomous lender can extend stablecoin
+credit against directly, without trusting Zacca's backend for the decision.
+The bounty submission and the Q3 2026 product milestone are the same artifact.
 
-## Known limitations (Stage 1 demo)
+## Known limitations, disclosed transparently
 
-- Features are synthetic (seeded by `businessId`), not yet backed by the real
-  VBR Data Rail — see the production swap-point note above.
-- `settle` runs after the handler returns 200, matching the reference
-  architecture's v1 behaviour (testnet, zero-value acceptable for now).
-- No HCS attestation of scoring decisions yet (planned — see Zacca's
-  Agentic Underwriting Engine roadmap for the audit-trail layer).
+- **Stage 2, not Stage 3** (see `IMPLEMENTATION_PLAN.md` §6.5): one key is the
+  sole attestor on all registries — not yet a multi-bureau attestor quorum.
+  `setAttestor()` exists on every registry so a quorum can be added without a
+  redeploy.
+- **Stubbed LLM reasoning** — `StubReasoningClient` is deterministic, not a
+  real model call; see the ICM swap point above.
+- **No cross-chain attestation bridge yet** — only Hedera-native attestations
+  are reachable today.
+- **`settle` runs after the handler returns 200**, matching the reference
+  architecture's behavior (acceptable for testnet).
+- **Credit-limit units are a known simplification** — applied 1:1 as raw zUSD
+  token units rather than converted through an actual HBAR-to-USD exchange
+  rate. Fine for proving the mechanism; a real deployment needs a real price
+  feed.
+- **Payment settlement is HBAR-on-Hedera only** — multi-chain facilitator
+  support for partner fintechs paying in their own stablecoin isn't built.
+- **No partner-facing SDKs, API docs, or x402-gated disbursement endpoint
+  yet** — see `IMPLEMENTATION_PLAN.md` §7.

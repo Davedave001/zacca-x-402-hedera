@@ -1,0 +1,13 @@
+{
+  "network": "hederaTestnet",
+  "chainId": 296,
+  "deployer": "0x11A7727b237d2DF9466F4Cfa57b4c337da4Ee6ED",
+  "deployedAt": "2026-07-21T12:08:40.674Z",
+  "contracts": {
+    "VBRRegistry": "0x9e5B1EEf866112d4641C3034DdF8e8F4Fdb3aa04",
+    "StatementRegistry": "0xd8cB93ec53098fc2e16796c47f5A262e2049f02A",
+    "DCSRegistry": "0x0Fa9b992f554b04Dedf0d136Ea0dAAE8bdb92A83",
+    "MockStablecoin": "0x1a25e6A46799865745a11D1250046eca04100747",
+    "CreditLine": "0x08A86476f0224a1c847060E23b372083687B5800"
+  }
+}
