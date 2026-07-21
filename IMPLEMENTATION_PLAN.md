@@ -179,4 +179,6 @@ The x402-gated REST API (§1, §3) is the source of truth, but asking a partner 
 
 ## 10. Open dependency carried over from the parent plan
 
-Per the ecosystem-level implementation plan's §11: any code patterns reused from prior collaborations must be cleanly separated/re-implemented before shipping under the Zacca name. This repo forks a third-party bounty reference (`matevszm/x402-hedera-example`, MIT-style bounty reference — verify license terms before public repo push) for the x402/Hedera plumbing only; the `CreditScoreProvider` and `dcs-scoring.ts` are original Zacca logic and are the actual submission asset.
+Per the ecosystem-level implementation plan's §11: any code patterns reused from prior collaborations must be cleanly separated/re-implemented before shipping under the Zacca name. This repo forks a third-party bounty reference (`matevszm/x402-hedera-example`) for the x402/Hedera plumbing only; the `CreditScoreProvider` and `dcs-scoring.ts` are original Zacca logic and are the actual submission asset.
+
+**License check (2026-07-21):** verified via the GitHub API — `matevszm/x402-hedera-example` has **no LICENSE file** (`license: null`), so the earlier "MIT-style" assumption in this doc was wrong; default copyright applies. Decision: proceed without adding a LICENSE file or attribution note, on the basis that the repo was published as a bounty reference architecture explicitly meant to be forked by contestants. Revisit if this submission is ever repurposed commercially beyond the bounty.
