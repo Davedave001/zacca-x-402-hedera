@@ -23,6 +23,7 @@ import {
   requireProduct,
 } from "../core/provider.js";
 import { HederaContractChainClient } from "../chain/client.js";
+import { loadDeployment } from "../chain/deployment.js";
 import { EvmPaymentError, verifyEvmPayment } from "./evm-payment.js";
 import type { ServerConfig } from "./config.js";
 
@@ -118,6 +119,17 @@ export function createApp(
 
   app.get("/health", (c) => c.json({ status: "ok", provider: provider.name }));
   app.get("/catalog", (c) => c.json(buildCatalog(provider, config)));
+
+  // Deployed contract addresses -- no secrets, just public on-chain
+  // addresses. Backs the SDK's read-only on-chain helpers (readCreditLine,
+  // readLoanTerms) so integrators don't have to hardcode/maintain them.
+  app.get("/contracts", (c) => {
+    try {
+      return c.json(loadDeployment().contracts);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
 
   // Free (not x402-gated) -- this is the business submitting their own
   // evidence to Zacca, the opposite value-flow direction from the priced

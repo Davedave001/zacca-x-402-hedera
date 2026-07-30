@@ -41,7 +41,7 @@ export function Catalog() {
 
   return (
     <section id="catalog">
-      <p className="section-label">002 / Live catalog</p>
+      <p className="section-label">002/Live catalog</p>
       <h2>Pulled live from GET /catalog -- not hardcoded.</h2>
       {error && <div className="callout error">Could not reach the API: {error}</div>}
       {!data && !error && <p style={{ color: "var(--muted)" }}>Loading catalog…</p>}

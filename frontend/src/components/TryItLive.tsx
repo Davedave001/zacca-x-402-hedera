@@ -97,7 +97,7 @@ export function TryItLive() {
 
   return (
     <section id="try-it">
-      <p className="section-label">003 / Try it live</p>
+      <p className="section-label">003/Try it live</p>
       <h2>Run the real 402 → sign → pay → 200 round trip, from this page.</h2>
 
       <div className="callout">

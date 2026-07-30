@@ -43,7 +43,7 @@ export function VbrInput() {
 
   return (
     <section id="vbr-input">
-      <p className="section-label">004 / Submit your own VBR data</p>
+      <p className="section-label">004/Submit your own VBR data</p>
       <h2>Input your business evidence — attested on-chain, credit limit updates immediately.</h2>
       <p style={{ color: "var(--muted)" }}>
         This writes directly to the on-chain <code>VBRRegistry</code> (Zacca's backend reviews and attests it — the

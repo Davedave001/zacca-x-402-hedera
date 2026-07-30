@@ -26,7 +26,7 @@ const TRANSACTIONS = [
 export function OnChainEvidence() {
   return (
     <section>
-      <p className="section-label">005 / On-chain evidence</p>
+      <p className="section-label">005/On-chain evidence</p>
       <h2>Real contracts, real transactions, on Hedera testnet.</h2>
       <p style={{ color: "var(--muted)" }}>
         Deployed 2026-07-21, independently confirmed via the Hedera testnet mirror

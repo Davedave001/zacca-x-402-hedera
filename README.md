@@ -153,6 +153,27 @@ verification steps in `IMPLEMENTATION_PLAN.md` §12:
   headless browser was available in this session. Treat it as
   "should work, unverified in a real wallet."
 
+## SDK for wallets and lending protocols (2026-07-30)
+
+`sdk/` (`@zacca/sdk`, source-only, not published to npm) is the partner
+integration layer from §7, actually built: `ZaccaClient` wraps the full
+pay-per-query flow behind one API for both payment mechanisms
+(`withHederaKey` / `withEvmWallet`), plus free helpers (`submitVbrData`)
+and two direct on-chain reads that need no payment at all
+(`readCreditLine`, `readLoanTerms`). See `sdk/README.md` for usage.
+
+`readLoanTerms` reads a new contract, **`LendingAdapter`** — a small,
+protocol-agnostic view interface (`getLoanTerms(businessId)`) that any
+external lending protocol can call directly to price an undercollateralized
+loan against a business's DCS attestation, no API key or relationship with
+Zacca required. Deliberately *not* integrated with a specific protocol's
+ABI: Bonzo Finance, Hedera's largest lending protocol, was exploited for
+~$9M via oracle manipulation on 2026-07-11 (implicating the same Supra
+price feed used elsewhere in this repo) and is currently paused — this
+adapter is the stable interface for Bonzo, once restored, or any other
+protocol to consume instead of a live integration with something currently
+compromised. Full detail and live-verification evidence: `IMPLEMENTATION_PLAN.md` §12.5.
+
 ## Architecture
 
 - `src/core/provider.ts` — the `DataProvider` contract (unchanged from reference)
@@ -167,6 +188,7 @@ verification steps in `IMPLEMENTATION_PLAN.md` §12:
 - `scripts/seed-demo-business.ts` / `scripts/demo-draw.ts` — seed on-chain evidence and demo a stablecoin draw
 - `contracts/` — separate Hardhat workspace; see `contracts/README.md`
 - `frontend/` — Vite/React landing page + live demo (`pay.zacca.ai`); see `frontend/README.md`
+- `sdk/` — `@zacca/sdk`, the wallet/lending-protocol integration SDK; see `sdk/README.md`
 
 Swap data source: one line in `src/providers/index.ts` (`DATA_PROVIDER=zacca-decentralized` (default) vs `zacca-credit` vs `mock`).
 Swap facilitator: change `FACILITATOR_URL`.

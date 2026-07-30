@@ -1,10 +1,12 @@
 :root {
+  /* Monochrome palette -- modeled on ledger.eduba.io's minimal, high-contrast,
+     accent-free look (black text on white, no color accents). */
   --bg: #ffffff;
-  --fg: #14140f;
-  --muted: #62615a;
-  --border: #e5e3da;
-  --card: #faf9f5;
-  --accent: #0a6847;
+  --fg: #0a0a08;
+  --muted: #6b6a63;
+  --border: #e3e1d8;
+  --card: #f7f6f2;
+  --accent: #0a0a08;
   --accent-fg: #ffffff;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   --sans:
@@ -14,13 +16,13 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14140f;
-    --fg: #f3f2ec;
-    --muted: #a3a196;
-    --border: #2e2d26;
-    --card: #1b1a15;
-    --accent: #34c98a;
-    --accent-fg: #0b1410;
+    --bg: #0a0a08;
+    --fg: #f5f4ee;
+    --muted: #96958c;
+    --border: #2a2924;
+    --card: #16150f;
+    --accent: #f5f4ee;
+    --accent-fg: #0a0a08;
     color-scheme: dark;
   }
 }

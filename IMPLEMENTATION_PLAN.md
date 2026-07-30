@@ -52,6 +52,9 @@ Two on-chain identities are involved, for a Hedera-specific reason worth knowing
 | Second `CreditLine` backed by real Hedera testnet USDC + frontend stablecoin selector | **Deployed 2026-07-30, pool unfunded** — see §12.2 for the funding blocker |
 | VBR self-input (`POST /vbr-input` + frontend form), dynamic credit-limit recalculation | **Built, live-verified 2026-07-30** — see §12.3 |
 | MetaMask/EVM-wallet payment path (`src/server/evm-payment.ts` + frontend) | **Backend live-verified 2026-07-30 with a real on-chain transaction; frontend built and compiles, not tested against a real MetaMask browser extension** — see §12.4 |
+| `sdk/` (`@zacca/sdk`) — wallet/lending-protocol integration SDK | **Built, live-verified end-to-end 2026-07-30** — see §12.5. Source-only, not published to npm |
+| `LendingAdapter` — protocol-agnostic credit-oracle contract for external lending protocols | **Deployed, tested (6/6), live-verified 2026-07-30** — see §12.5 |
+| Frontend design tightened toward `ledger.eduba.io` (monochrome, exact section-numbering format) | **Done 2026-07-30** — best-effort qualitative match; exact hex/font values weren't extractable via the fetch tool used (converts to text, strips CSS) |
 | Demo video (<5 min) | **Not yet recorded** |
 | Submission form | **Not yet submitted** |
 
@@ -438,3 +441,65 @@ user get a sensible error if they reject the transaction, etc.) has not
 been exercised. Treat this as "should work, unverified in a real wallet"
 rather than "verified," and test it in a real browser before relying on it
 for a demo video.
+
+### 12.5 `@zacca/sdk` and `LendingAdapter`: wallet/lending-protocol integration layer
+
+`sdk/` (own `package.json`, `@zacca/sdk`) is the partner integration layer
+described as a roadmap item in §7 -- now actually built. `ZaccaClient`
+wraps the full pay-per-query flow behind one API regardless of which
+payment mechanism a wallet's users hold keys with:
+
+```ts
+ZaccaClient.withHederaKey(apiBaseUrl, accountId, privateKeyHex)  // native Hedera signer, §6
+ZaccaClient.withEvmWallet(apiBaseUrl, ethersSigner)              // MetaMask-style, §12.4
+```
+
+Both expose the identical `vbrLookup` / `dcsScore` / `creditLimit` methods
+(typed, oracle/stablecoin options included), plus free helpers:
+`submitVbrData` (§12.3), and two direct on-chain reads that need no x402
+payment at all -- `readCreditLine` and `readLoanTerms` (below). A new
+`GET /contracts` endpoint (no secrets, just addresses) backs these so the
+SDK doesn't have to hardcode/maintain deployed contract addresses itself.
+
+**`LendingAdapter`** -- `0x00f524672Ac5C3D3ea27cd967bbd9771476f7CB1` -- is
+the answer to "can Zacca integrate with on-chain lending protocols to
+facilitate lending": a small, protocol-agnostic contract exposing
+`getLoanTerms(businessId) view returns (eligible, dcs, riskTier,
+maxLoanToValueBps, suggestedInterestRateBps)`, reading the same
+`DCSRegistry` attestation as `CreditLine`. Any external lending
+protocol -- an Aave-fork-style money market, a BNPL underwriter, a keeper
+bot -- can call this directly, with no API key, payment, or relationship
+with Zacca required at call time; the on-chain attestation is what's
+trusted, not a runtime call back into Zacca's backend. Risk-tier -> max-LTV
+bands mirror the existing `TIER_POLICIES` risk multiplier bands
+(`src/core/dcs-scoring.ts`) for methodological consistency with the rest of
+the scoring stack.
+
+**Deliberately not integrated with a specific third-party protocol's ABI.**
+Bonzo Finance -- Hedera's largest lending protocol, an Aave V2 fork -- was
+exploited for ~$9M via oracle-price manipulation (a Supra price-feed
+signature-verification flaw) on 2026-07-11 and is currently paused for
+recovery. Integrating live with a paused/compromised protocol's contracts
+right now wouldn't be a sound choice, so `LendingAdapter` is the stable,
+protocol-agnostic reference interface instead -- ready for Bonzo once
+restored, or any other protocol, to consume. This also reinforces why
+§12.1's multi-oracle (Pyth + Supra) cross-check matters: single-oracle
+dependence is exactly what the Bonzo exploit turned on.
+
+**Verified live end-to-end, 2026-07-30** (contracts: 20/20 Hardhat tests
+passing including 6 new `LendingAdapter` tests; SDK: `tsc` clean):
+- `ZaccaClient.withHederaKey(...).dcsScore(businessId, { oracle: "supra" })`
+  -- real paid call, `dcs: 96`, `riskTier: "A"`.
+- `ZaccaClient.withEvmWallet(...).vbrLookup(businessId)` -- real paid call
+  via a plain EVM transfer (the same mechanism as §12.4).
+- `submitVbrData(...)` -- real on-chain `VBRRegistry` write.
+- `readCreditLine(businessId)` -- free on-chain read, matches the paid
+  `credit-limit` response exactly.
+- `readLoanTerms(businessId)` -- free on-chain read of `LendingAdapter`:
+  correctly returned 90% max LTV / 8.21% suggested rate for the
+  well-scored demo business, and correctly returned `eligible: false` for
+  a business with no DCS attestation yet.
+
+Not done: `@zacca/sdk` is not published to npm (source-only, `cd sdk &&
+npm install && npm run build`); a Python SDK (§7.2) remains undone; the
+OpenAPI spec / docs site (§7.3) remain undone.

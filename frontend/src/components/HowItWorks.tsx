@@ -20,7 +20,7 @@ const STEPS = [
 export function HowItWorks() {
   return (
     <section>
-      <p className="section-label">001 / How it works</p>
+      <p className="section-label">001/How it works</p>
       <h2>Four steps, all verifiable independently of Zacca's backend.</h2>
       <div className="grid">
         {STEPS.map((step, i) => (
