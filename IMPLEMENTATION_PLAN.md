@@ -54,7 +54,7 @@ Two on-chain identities are involved, for a Hedera-specific reason worth knowing
 | MetaMask/EVM-wallet payment path (`src/server/evm-payment.ts` + frontend) | **Backend live-verified 2026-07-30 with a real on-chain transaction; frontend built and compiles, not tested against a real MetaMask browser extension** — see §12.4 |
 | `sdk/` (`@zacca/sdk`) — wallet/lending-protocol integration SDK | **Built, live-verified end-to-end 2026-07-30** — see §12.5. Source-only, not published to npm |
 | `LendingAdapter` — protocol-agnostic credit-oracle contract for external lending protocols | **Deployed, tested (6/6), live-verified 2026-07-30** — see §12.5 |
-| Frontend design tightened toward `ledger.eduba.io` (monochrome, exact section-numbering format) | **Done 2026-07-30** — best-effort qualitative match; exact hex/font values weren't extractable via the fetch tool used (converts to text, strips CSS) |
+| Frontend design matched to `ledger.eduba.io` | **Done 2026-07-30, exact values (not a qualitative guess)** — first pass used a lossy text-summarizing fetch tool and produced a wrong monochrome palette; second pass `curl`'d the raw HTML + linked CSS directly and pulled the real hex colors, exact font-family stack, exact type scale, and exact two-column section layout. See §12.6 |
 | Demo video (<5 min) | **Not yet recorded** |
 | Submission form | **Not yet submitted** |
 
@@ -503,3 +503,57 @@ passing including 6 new `LendingAdapter` tests; SDK: `tsc` clean):
 Not done: `@zacca/sdk` is not published to npm (source-only, `cd sdk &&
 npm install && npm run build`); a Python SDK (§7.2) remains undone; the
 OpenAPI spec / docs site (§7.3) remain undone.
+
+### 12.6 Frontend design: getting `ledger.eduba.io`'s actual values, not a guess
+
+The first design pass (§11) used `WebFetch` -- a tool that converts a page
+to text and summarizes it with a small model -- to describe
+`ledger.eduba.io`'s look. That description was wrong in a material way: it
+came back as "minimalist... light mode... no visible accent color," which
+led to a monochrome black/white palette. The real site is not monochrome.
+
+The fix: `curl` the raw HTML directly (not through a summarizing tool),
+find the linked CSS chunk files in the `<head>`, and `curl` those directly
+too. This surfaces the literal shipped values -- colors, font stacks, exact
+pixel/clamp sizes, exact class structure -- with nothing lost to a
+text-conversion step. Corrected findings, applied to `frontend/src/index.css`:
+
+- **Palette is warm wine/rose, not monochrome**: background `#ffffff`
+  (`--eb-theme-paper-bg`), heading/primary text `#5d3136`
+  (`--eb-theme-paper-title`, also the outer page-frame background), body
+  copy `#7d5658` (`--eb-subtitle`), muted text `#a2777a`
+  (`--eb-light-brown`), chip background `#d8bfc0` (`--eb-light-pink`),
+  danger `#b6313a`, a bright green status-dot `#25ca58`.
+- **Fonts**: heading/display font stack is literally `"Diatype", "Space
+  Grotesk", system-ui, sans-serif`; UI chrome (nav, buttons, chips, section
+  number labels) uses `"IBM Plex Mono", ui-monospace, SFMono-Regular,
+  Menlo, monospace`. **Diatype is not used here** -- it's a proprietary font
+  the site self-hosts via `@font-face` pointing at its own
+  `/fonts/diatype-*.woff2` files, which can't legally be copied into this
+  project. Their own font stack's next fallback, **Space Grotesk**, is free
+  and open (Google Fonts) and is what `frontend/index.html` loads instead.
+  This is the one deliberate, disclosed substitution; everything else below
+  matches the real, shipped values.
+- **Structure**: an outer fixed "frame" (padding ~8px, background
+  `#5d3136`) insets a white, rounded (4px) content card -- not a flat
+  single-background page. Each numbered section is a genuine **two-column
+  header**, not a stacked label-above-heading: the `NNN/Label` meta sits on
+  the left (`flex: .8`, mono, uppercase, the `/` at 50% opacity) and the
+  title + description are pushed right via `margin-left: auto`
+  (`max-width: 720px`), collapsing to a single column under 640px.
+  `pageInner` is `max-width: 1500px`, `padding: 100px 40px` (desktop).
+- **Buttons**: the primary CTA is `background: var(--dark-brown)`, mono
+  font, uppercase, `border-radius: 6px` (their live site actually uses
+  `0 0 6px 6px` -- flat top / rounded bottom, a "tab" shape attached to
+  something above it in their layout; simplified to a plain `6px` all
+  around here since nothing sits directly above the button in this
+  frontend's own layout).
+
+Rebuilt: `frontend/src/index.css` (full token + component rewrite),
+`frontend/index.html` (Google Fonts `<link>` for Space Grotesk + IBM Plex
+Mono), `frontend/src/components/Nav.tsx` (new -- logo, nav links, chips),
+`frontend/src/components/SectionHeader.tsx` (new -- the two-column
+number/label/title/description pattern, reused by every numbered section),
+and `App.tsx` (the frame/content-card/nav wrapper). Verified: `npm run
+build` clean, `vite preview` serves 200 with the correct Google Fonts
+`<link>` present in the built HTML.

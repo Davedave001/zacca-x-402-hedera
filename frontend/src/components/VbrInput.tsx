@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { API_BASE_URL } from "../lib/config";
+import { SectionHeader } from "./SectionHeader";
 
 type Status = "idle" | "submitting" | "done" | "error";
 
@@ -42,16 +43,20 @@ export function VbrInput() {
   }
 
   return (
-    <section id="vbr-input">
-      <p className="section-label">004/Submit your own VBR data</p>
-      <h2>Input your business evidence — attested on-chain, credit limit updates immediately.</h2>
-      <p style={{ color: "var(--muted)" }}>
-        This writes directly to the on-chain <code>VBRRegistry</code> (Zacca's backend reviews and attests it — the
-        same trust model as the seeded demo data, not a self-attestation). Try it with a brand-new business id: it
-        starts with zero evidence, and after submitting, <code>dcs-score</code>/<code>credit-limit</code> above will
-        immediately reflect a real (if modest, since there's no cash-flow statement yet) score instead of "no
-        evidence on file."
-      </p>
+    <section className="eb-section" id="vbr-input">
+      <SectionHeader
+        number="004"
+        label="Submit your own VBR data"
+        title="Input your business evidence — attested on-chain, credit limit updates immediately."
+      >
+        <p className="section-text">
+          This writes directly to the on-chain <code>VBRRegistry</code> (Zacca's backend reviews and attests it —
+          the same trust model as the seeded demo data, not a self-attestation). Try it with a brand-new business
+          id: it starts with zero evidence, and after submitting, <code>dcs-score</code>/<code>credit-limit</code>{" "}
+          above will immediately reflect a real (if modest, since there's no cash-flow statement yet) score instead
+          of "no evidence on file."
+        </p>
+      </SectionHeader>
 
       <form onSubmit={handleSubmit}>
         <div className="grid cols-3">

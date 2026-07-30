@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { PayFlowError, runPaidRequest, type PayResult, type PayStep } from "../lib/payClient";
 import { runMetaMaskPaidRequest } from "../lib/metamaskPay";
 import { API_BASE_URL, DEFAULT_BUSINESS_ID, HASHSCAN_TESTNET } from "../lib/config";
+import { SectionHeader } from "./SectionHeader";
 
 const PRODUCTS = [
   { id: "vbr-lookup", label: "vbr-lookup — 0.01 HBAR", priceTinybars: "1000000" },
@@ -96,9 +97,8 @@ export function TryItLive() {
   }
 
   return (
-    <section id="try-it">
-      <p className="section-label">003/Try it live</p>
-      <h2>Run the real 402 → sign → pay → 200 round trip, from this page.</h2>
+    <section className="eb-section" id="try-it">
+      <SectionHeader number="003" label="Try it live" title="Run the real 402 → sign → pay → 200 round trip, from this page." />
 
       <div className="callout">
         Testnet HBAR only — no real money. With "Paste a key," your private

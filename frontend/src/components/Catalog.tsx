@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_BASE_URL } from "../lib/config";
+import { SectionHeader } from "./SectionHeader";
 
 interface CatalogProduct {
   id: string;
@@ -40,9 +41,8 @@ export function Catalog() {
   }, []);
 
   return (
-    <section id="catalog">
-      <p className="section-label">002/Live catalog</p>
-      <h2>Pulled live from GET /catalog -- not hardcoded.</h2>
+    <section className="eb-section" id="catalog">
+      <SectionHeader number="002" label="Live catalog" title="Pulled live from GET /catalog -- not hardcoded." />
       {error && <div className="callout error">Could not reach the API: {error}</div>}
       {!data && !error && <p style={{ color: "var(--muted)" }}>Loading catalog…</p>}
       {data && (

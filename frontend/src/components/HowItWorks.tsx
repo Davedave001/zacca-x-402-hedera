@@ -1,3 +1,5 @@
+import { SectionHeader } from "./SectionHeader";
+
 const STEPS = [
   {
     title: "Pay per call",
@@ -19,9 +21,8 @@ const STEPS = [
 
 export function HowItWorks() {
   return (
-    <section>
-      <p className="section-label">001/How it works</p>
-      <h2>Four steps, all verifiable independently of Zacca's backend.</h2>
+    <section className="eb-section">
+      <SectionHeader number="001" label="How it works" title="Four steps, all verifiable independently of Zacca's backend." />
       <div className="grid">
         {STEPS.map((step, i) => (
           <div key={step.title} style={{ display: "flex", gap: 20 }}>
@@ -32,8 +33,10 @@ export function HowItWorks() {
               {String(i + 1).padStart(2, "0")}
             </div>
             <div>
-              <h3>{step.title}</h3>
-              <p style={{ color: "var(--muted)" }}>{step.body}</p>
+              <h3 style={{ fontFamily: "var(--font-primary)", color: "var(--fg)", margin: "0 0 6px" }}>
+                {step.title}
+              </h3>
+              <p style={{ color: "var(--subtitle)", margin: 0, fontSize: 14, lineHeight: 1.6 }}>{step.body}</p>
             </div>
           </div>
         ))}

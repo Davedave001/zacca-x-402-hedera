@@ -1,3 +1,4 @@
+import { Nav } from "./components/Nav";
 import { Hero } from "./components/Hero";
 import { HowItWorks } from "./components/HowItWorks";
 import { Catalog } from "./components/Catalog";
@@ -8,15 +9,20 @@ import { Footer } from "./components/Footer";
 
 function App() {
   return (
-    <>
-      <Hero />
-      <HowItWorks />
-      <Catalog />
-      <TryItLive />
-      <VbrInput />
-      <OnChainEvidence />
-      <Footer />
-    </>
+    <div className="eb-frame">
+      <div className="eb-content">
+        <Nav />
+        <div className="page-inner">
+          <Hero />
+          <HowItWorks />
+          <Catalog />
+          <TryItLive />
+          <VbrInput />
+          <OnChainEvidence />
+        </div>
+        <Footer />
+      </div>
+    </div>
   );
 }
 

@@ -1,28 +1,45 @@
+/*
+ * Design tokens extracted directly from ledger.eduba.io's shipped CSS
+ * (fetched and read verbatim, not summarized) -- see IMPLEMENTATION_PLAN.md
+ * for how. One deliberate substitution: their heading font "Diatype" is a
+ * proprietary, self-hosted font (@font-face pointing at their own
+ * /fonts/diatype-*.woff2 files) that can't legally be copied into this
+ * project. Their own font stack lists "Space Grotesk" as the next
+ * fallback -- a free, open Google Font -- so that's used here instead of
+ * Diatype specifically. Everything else (colors, type scale, layout
+ * structure, button/chip styling) matches their real, shipped values.
+ */
 :root {
-  /* Monochrome palette -- modeled on ledger.eduba.io's minimal, high-contrast,
-     accent-free look (black text on white, no color accents). */
   --bg: #ffffff;
-  --fg: #0a0a08;
-  --muted: #6b6a63;
-  --border: #e3e1d8;
-  --card: #f7f6f2;
-  --accent: #0a0a08;
-  --accent-fg: #ffffff;
-  --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  --sans:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --bg-off: #fefbf6;
+  --frame: #5d3136;
+  --fg: #5d3136;
+  --subtitle: #7d5658;
+  --muted: #a2777a;
+  --border: rgba(93, 49, 54, 0.16);
+  --chip-bg: #d8bfc0;
+  --cream: #ead5d6;
+  --danger: #b6313a;
+  --dot-green: #25ca58;
+  --fg-inverse: #fefbf6;
+
+  --font-primary: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0a0a08;
-    --fg: #f5f4ee;
-    --muted: #96958c;
-    --border: #2a2924;
-    --card: #16150f;
-    --accent: #f5f4ee;
-    --accent-fg: #0a0a08;
+    --bg: #2e1a1d;
+    --bg-off: #351f22;
+    --frame: #421d24;
+    --fg: #fefbf6;
+    --subtitle: #dcb9ba;
+    --muted: #c99a9c;
+    --border: rgba(254, 251, 246, 0.18);
+    --chip-bg: rgba(254, 251, 246, 0.14);
+    --cream: rgba(254, 251, 246, 0.08);
+    --fg-inverse: #5d3136;
     color-scheme: dark;
   }
 }
@@ -35,20 +52,14 @@ html,
 body {
   margin: 0;
   padding: 0;
+  height: 100%;
 }
 
 body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--sans);
-  line-height: 1.55;
+  font-family: var(--font-mono);
+  background: var(--frame);
   -webkit-font-smoothing: antialiased;
-}
-
-#root {
-  max-width: 920px;
-  margin: 0 auto;
-  padding: 0 24px;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 a {
@@ -58,72 +69,244 @@ a {
 code,
 pre,
 .mono {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
 }
 
-section {
-  padding: 64px 0;
-  border-bottom: 1px solid var(--border);
+/* Outer frame -- the inset margin around the white content card, matching
+   eduba's fixed full-bleed frame + rounded content wrapper structure. */
+.eb-frame {
+  padding: 8px;
+  min-height: 100vh;
+  background: var(--frame);
 }
 
-section:last-of-type {
-  border-bottom: none;
+@media (max-width: 640px) {
+  .eb-frame {
+    padding: 5px;
+  }
 }
 
-.section-label {
-  font-family: var(--mono);
-  font-size: 13px;
+.eb-content {
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 4px;
+  overflow: hidden;
+  min-height: calc(100vh - 16px);
+  font-family: var(--font-primary);
+}
+
+.eb-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 40px 0;
+}
+
+@media (max-width: 640px) {
+  .eb-nav {
+    padding: 16px 20px 0;
+  }
+}
+
+.eb-logo {
+  font-family: var(--font-mono);
   letter-spacing: 0.04em;
-  color: var(--muted);
-  margin: 0 0 8px;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg);
+  text-decoration: none;
 }
 
-h1 {
-  font-size: clamp(32px, 5vw, 48px);
-  line-height: 1.1;
-  margin: 0 0 20px;
-  letter-spacing: -0.02em;
+.eb-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
 }
 
-h2 {
-  font-size: 26px;
-  line-height: 1.25;
-  margin: 0 0 24px;
-  letter-spacing: -0.01em;
-}
-
-h3 {
-  font-size: 16px;
-  margin: 0 0 8px;
-}
-
-p {
-  margin: 0 0 16px;
+.eb-nav-link {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
   color: var(--fg);
 }
 
-p.lead {
-  font-size: 18px;
-  color: var(--muted);
-  max-width: 640px;
+.chip {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--fg);
+  background: var(--chip-bg);
+  border-radius: 4px;
+  padding: 3px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
+.chip.primary {
+  background: var(--fg);
+  color: var(--fg-inverse);
+}
+
+.chip .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--dot-green);
+  animation: dot-blink 2s ease-in-out infinite;
+}
+
+@keyframes dot-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
+.page-inner {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 60px 40px 100px;
+}
+
+@media (max-width: 640px) {
+  .page-inner {
+    padding: 40px 20px 60px;
+  }
+}
+
+/* Hero */
+h1.hero-title {
+  font-family: var(--font-primary);
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  margin: 0 0 20px;
+  font-size: clamp(36px, 5vw, 80px);
+  font-weight: 700;
+  line-height: 1;
+  max-width: 60%;
+}
+
+@media (max-width: 640px) {
+  h1.hero-title {
+    max-width: 100%;
+    font-size: clamp(32px, 10vw, 48px);
+  }
+}
+
+p.hero-subtitle {
+  max-width: 620px;
+  color: var(--subtitle);
+  margin: 0 0 28px;
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.6;
+}
+
+/* Numbered sections -- eduba's exact two-column layout: the "NNN/Title"
+   meta label on the left (flex: .8), the section title + body pushed to
+   the right via margin-left: auto, collapsing to a single column on
+   mobile. */
+section.eb-section {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  padding: 50px 0 80px;
+  border-top: 1px solid var(--border);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 32px;
+}
+
+@media (max-width: 640px) {
+  .section-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+.section-meta {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  color: var(--fg);
+  flex: 0.8;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.section-meta .slash {
+  opacity: 0.5;
+}
+
+.section-info {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 720px;
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .section-info {
+    max-width: none;
+    margin-left: 0;
+  }
+}
+
+.section-title {
+  font-family: var(--font-primary);
+  max-width: 720px;
+  color: var(--fg);
+  margin: 0;
+  font-size: clamp(24px, 3.4vw, 40px);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+p.section-text {
+  color: var(--subtitle);
+  max-width: 640px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.6;
+}
+
+/* Buttons -- primary CTA uses the "tab" shape (flat top, rounded bottom)
+   from the live site's own primaryButton class. */
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 18px;
-  border-radius: 6px;
-  border: 1px solid var(--fg);
+  gap: 10px;
   background: var(--fg);
-  color: var(--bg);
-  font-size: 15px;
-  font-weight: 600;
+  color: var(--fg-inverse);
+  border: 1px solid var(--fg);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  border-radius: 6px;
+  padding: 13px 26px;
+  font-size: 14px;
+  font-weight: 700;
   text-decoration: none;
   cursor: pointer;
-  transition:
-    transform 0.1s ease,
-    opacity 0.15s ease;
+  transition: opacity 0.18s;
 }
 
 .btn:hover {
@@ -141,7 +324,7 @@ p.lead {
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -149,7 +332,6 @@ p.lead {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
-  margin-top: 8px;
 }
 
 .grid {
@@ -168,20 +350,21 @@ p.lead {
 }
 
 .card {
-  background: var(--card);
+  background: var(--bg-off);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 20px;
 }
 
 .badge {
   display: inline-block;
-  font-family: var(--mono);
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  color: var(--muted);
+  color: var(--subtitle);
 }
 
 table {
@@ -198,25 +381,26 @@ td {
 }
 
 th {
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
   font-weight: 600;
 }
 
-td.mono,
-th.mono {
-  font-family: var(--mono);
+td.mono-cell,
+th.mono-cell {
+  font-family: var(--font-mono);
   font-size: 13px;
 }
 
 input,
 select {
-  font-family: var(--sans);
+  font-family: var(--font-primary);
   font-size: 15px;
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg);
@@ -225,13 +409,16 @@ select {
 
 input:focus,
 select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
+  outline: 2px dashed var(--fg);
+  outline-offset: 2px;
 }
 
 label {
   display: block;
-  font-size: 13px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--muted);
   margin-bottom: 6px;
 }
@@ -241,11 +428,11 @@ label {
 }
 
 .log {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 13px;
-  background: var(--card);
+  background: var(--bg-off);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 16px;
   white-space: pre-wrap;
   word-break: break-all;
@@ -258,7 +445,8 @@ label {
 }
 
 .log .step-label {
-  color: var(--accent);
+  color: var(--fg);
+  font-weight: 600;
 }
 
 .log .step-detail {
@@ -266,41 +454,44 @@ label {
 }
 
 .result-json {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 13px;
-  background: var(--card);
+  background: var(--bg-off);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 16px;
   overflow-x: auto;
 }
 
 .callout {
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--fg);
   padding: 10px 16px;
-  background: var(--card);
-  border-radius: 0 6px 6px 0;
+  background: var(--bg-off);
+  border-radius: 0 4px 4px 0;
   font-size: 14px;
-  color: var(--muted);
+  color: var(--subtitle);
   margin-bottom: 16px;
 }
 
-.error {
-  border-left-color: #c0392b;
-  color: #c0392b;
+.callout.error {
+  border-left-color: var(--danger);
+  color: var(--danger);
 }
 
 footer {
-  padding: 40px 0 60px;
-  font-size: 13px;
+  padding: 40px 40px 60px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 11px;
   color: var(--muted);
   display: flex;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .hashscan-link {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 13px;
 }
