@@ -8,19 +8,20 @@ import { reason } from "./03-reasoning/index.js";
 import type { ReasoningClient } from "./03-reasoning/index.js";
 import { review } from "./04-review/index.js";
 import { attest } from "./05-attest/index.js";
-import type { AttestResult, ChainReader, ChainWriter } from "./types.js";
+import type { AttestResult, ChainReader, ChainWriter, OracleReader } from "./types.js";
 
 export interface RunIcmPipelineOptions {
   businessId: string;
   chainReader: ChainReader;
   chainWriter: ChainWriter;
   reasoningClient: ReasoningClient;
+  oracleReader: OracleReader;
 }
 
 export async function runIcmPipeline(options: RunIcmPipelineOptions): Promise<AttestResult> {
-  const { businessId, chainReader, chainWriter, reasoningClient } = options;
+  const { businessId, chainReader, chainWriter, reasoningClient, oracleReader } = options;
 
-  const intakeResult = await intake(businessId, chainReader);
+  const intakeResult = await intake(businessId, chainReader, oracleReader);
   const crossCheckResult = crossCheck(intakeResult);
   const draft = await reason(intakeResult, crossCheckResult, reasoningClient);
   const reviewed = review(draft);

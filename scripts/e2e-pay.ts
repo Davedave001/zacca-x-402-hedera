@@ -48,7 +48,12 @@ async function main() {
     );
   }
   const paramName = product.params[0] ?? "businessId";
-  const url = `${SERVER_URL}/data/${product.id}?${paramName}=${encodeURIComponent(SUBJECT)}`;
+  const oracle = process.env.E2E_ORACLE;
+  const stablecoin = process.env.E2E_STABLECOIN;
+  const extraParams =
+    (oracle ? `&oracle=${encodeURIComponent(oracle)}` : "") +
+    (stablecoin ? `&stablecoin=${encodeURIComponent(stablecoin)}` : "");
+  const url = `${SERVER_URL}/data/${product.id}?${paramName}=${encodeURIComponent(SUBJECT)}${extraParams}`;
   console.log(`[e2e] product: ${product.id} (${product.priceHbar} HBAR)`);
   console.log(`[e2e] url:     ${url}`);
 

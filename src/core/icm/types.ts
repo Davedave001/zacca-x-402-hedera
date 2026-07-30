@@ -28,6 +28,23 @@ export interface ChainWriter {
   ): Promise<{ transactionHash: string }>;
 }
 
+/**
+ * Live price oracle surface (src/chain/oracles.ts) -- injected the same way
+ * as ChainReader/ChainWriter, so the pipeline stays testable without a live
+ * RPC call and swappable across oracle networks without touching stage logic.
+ */
+export interface OracleReader {
+  getHbarUsdPrice(): Promise<OracleQuote>;
+}
+
+export interface OracleQuote {
+  provider: string;
+  pair: string;
+  price: number;
+  publishTime: number;
+  ageSeconds: number;
+}
+
 export interface StatementStats {
   periodStart: number;
   periodEnd: number;
@@ -40,6 +57,7 @@ export interface IntakeResult {
   vbrClaimHash: string | null;
   statementAttested: boolean;
   statement: StatementStats | null;
+  oracle: OracleQuote | null;
 }
 
 export interface CrossCheckResult {
@@ -60,8 +78,10 @@ export interface ReviewResult extends ReasoningDraft {
 
 export interface AttestResult extends ReviewResult {
   businessId: string;
-  creditLimitTinybars: bigint;
+  /** Credit limit in the disbursed stablecoin's raw units (6 decimals), oracle-converted from HBAR turnover. */
+  creditLimitStablecoinUnits: bigint;
   maxTenureMonths: number;
   rationaleHash: string;
   onChain: { transactionHash: string } | null;
+  oracle: OracleQuote | null;
 }

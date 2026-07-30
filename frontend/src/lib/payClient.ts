@@ -36,6 +36,13 @@ export class PayFlowError extends Error {
   }
 }
 
+export interface PaidRequestOptions {
+  /** Which live price oracle backs the reasoning/credit-limit conversion (dcs-score, credit-limit only). */
+  oracleId?: "pyth" | "supra";
+  /** Which CreditLine/disbursement stablecoin to report on (credit-limit only). */
+  stablecoin?: "zusd" | "usdc";
+}
+
 /**
  * Runs the full paid flow for one product against the live API.
  *
@@ -44,6 +51,7 @@ export class PayFlowError extends Error {
  * @param accountId funded Hedera testnet account id (e.g. "0.0.xxxx")
  * @param privateKeyHex DER or raw hex-encoded testnet private key, browser-local only
  * @param onStep called after each step so the UI can render progress live
+ * @param options optional oracle/stablecoin selection
  */
 export async function runPaidRequest(
   productId: string,
@@ -51,6 +59,7 @@ export async function runPaidRequest(
   accountId: string,
   privateKeyHex: string,
   onStep: (step: PayStep) => void,
+  options: PaidRequestOptions = {},
 ): Promise<PayResult> {
   const steps: PayStep[] = [];
   const record = (label: string, detail?: string) => {
@@ -59,7 +68,10 @@ export async function runPaidRequest(
     onStep(step);
   };
 
-  const url = `${API_BASE_URL}/data/${productId}?businessId=${encodeURIComponent(businessId)}`;
+  const extraParams =
+    (options.oracleId ? `&oracle=${options.oracleId}` : "") +
+    (options.stablecoin ? `&stablecoin=${options.stablecoin}` : "");
+  const url = `${API_BASE_URL}/data/${productId}?businessId=${encodeURIComponent(businessId)}${extraParams}`;
 
   record("Requesting without payment", url);
   const unpaid = await fetch(url);

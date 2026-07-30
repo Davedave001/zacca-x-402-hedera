@@ -6,6 +6,9 @@ import type { CrossCheckResult, IntakeResult } from "../types.js";
  */
 const LOW_TURNOVER_THRESHOLD_TINYBARS = 500_000_000n;
 
+/** Oracle quotes older than this are flagged as potentially unreliable for FX conversion. */
+const STALE_ORACLE_THRESHOLD_SECONDS = 3600;
+
 /** See CONTEXT.md -- assess evidence quality, no scoring. */
 export function crossCheck(intake: IntakeResult): CrossCheckResult {
   const flags: string[] = [];
@@ -34,6 +37,17 @@ export function crossCheck(intake: IntakeResult): CrossCheckResult {
     }
   }
 
+  if (!intake.oracle) {
+    flags.push("no live oracle price available -- credit limit FX conversion may be unreliable");
+  } else if (intake.oracle.ageSeconds > STALE_ORACLE_THRESHOLD_SECONDS) {
+    flags.push(
+      `${intake.oracle.provider} HBAR/USD price is ${Math.round(intake.oracle.ageSeconds / 60)} minutes old -- may not reflect the current rate`,
+    );
+  }
+
+  // Strong requires both evidence sources AND no flags at all (including a
+  // stale/missing oracle price) -- a great VBR+statement pair scored against
+  // an unreliable FX rate isn't "strong" evidence for the resulting limit.
   let evidenceQuality: CrossCheckResult["evidenceQuality"];
   if (intake.vbrAttested && intake.statementAttested && flags.length === 0) {
     evidenceQuality = "strong";

@@ -1,13 +1,14 @@
 import { AbiCoder } from "ethers";
-import type { ChainReader, IntakeResult, StatementStats } from "../types.js";
+import type { ChainReader, IntakeResult, OracleReader, StatementStats } from "../types.js";
 
 const abiCoder = AbiCoder.defaultAbiCoder();
 
 /** See CONTEXT.md -- fetch and decode on-chain evidence, no judgment calls. */
-export async function intake(businessId: string, chain: ChainReader): Promise<IntakeResult> {
-  const [vbr, statement] = await Promise.all([
+export async function intake(businessId: string, chain: ChainReader, oracle: OracleReader): Promise<IntakeResult> {
+  const [vbr, statement, oracleQuote] = await Promise.all([
     chain.readVbrAttestation(businessId),
     chain.readStatementAttestation(businessId),
+    oracle.getHbarUsdPrice().catch(() => null),
   ]);
 
   let statementStats: StatementStats | null = null;
@@ -29,5 +30,6 @@ export async function intake(businessId: string, chain: ChainReader): Promise<In
     vbrClaimHash: vbr?.claimHash ?? null,
     statementAttested: statement !== null,
     statement: statementStats,
+    oracle: oracleQuote,
   };
 }

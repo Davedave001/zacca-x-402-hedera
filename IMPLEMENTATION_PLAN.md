@@ -47,10 +47,15 @@ Two on-chain identities are involved, for a Hedera-specific reason worth knowing
 | Live stablecoin draw against `CreditLine` (§6.4 payoff) | **Done, verified on mirror node 2026-07-21** — `scripts/demo-draw.ts`, 10 zUSD disbursed |
 | `frontend/` (Vite/React landing page + live in-browser pay demo, for `pay.zacca.ai`) | **Built 2026-07-30** — CORS added to backend for it |
 | `Dockerfile` (backend) / `frontend/Dockerfile` / `docker-compose.yml` / `DEPLOY.md` | **Built and locally smoke-tested 2026-07-30** — both images build, both containers run, CORS/402 flow verified end-to-end via curl; actual Coolify/Hostinger deploy still pending (needs DNS + Coolify UI steps only I can't do) |
+| Live price oracles (Pyth + Supra, real Hedera testnet deployments) feeding DCS reasoning + credit-limit FX conversion | **Built, live-verified 2026-07-30** — see §12.1 |
+| Oracle-provider selector (frontend + `?oracle=` API param) | **Built, live-verified 2026-07-30** — see §12.1 |
+| Second `CreditLine` backed by real Hedera testnet USDC + frontend stablecoin selector | **Deployed 2026-07-30, pool unfunded** — see §12.2 for the funding blocker |
+| VBR self-input (`POST /vbr-input` + frontend form), dynamic credit-limit recalculation | **Built, live-verified 2026-07-30** — see §12.3 |
+| MetaMask/EVM-wallet payment path (`src/server/evm-payment.ts` + frontend) | **Backend live-verified 2026-07-30 with a real on-chain transaction; frontend built and compiles, not tested against a real MetaMask browser extension** — see §12.4 |
 | Demo video (<5 min) | **Not yet recorded** |
 | Submission form | **Not yet submitted** |
 
-Net: Step 0–3 of the original bounty-scoped checklist (§8) are done, and the scope itself expanded partway through: rather than shipping Stage 1 alone and treating decentralization as a post-bounty roadmap, §6 was built and deployed for this submission, and a real frontend + Docker/Coolify deployment path was added afterward (§11). The blocking path now is Step 4–5 (demo video, submit) plus the actual Coolify deploy.
+Net: Step 0–3 of the original bounty-scoped checklist (§8) are done, and the scope itself expanded partway through: rather than shipping Stage 1 alone and treating decentralization as a post-bounty roadmap, §6 was built and deployed for this submission, a real frontend + Docker/Coolify deployment path was added afterward (§11), and then live oracles, a second stablecoin, VBR self-input, and a MetaMask payment path were added on top (§12). The blocking path now is Step 4–5 (demo video, submit), the actual Coolify deploy, and the two manual-only items flagged in §12 (USDC pool funding, real-browser MetaMask testing).
 
 ## 3. Product catalog (as designed)
 
@@ -199,7 +204,7 @@ The x402-gated REST API (§1, §3) is the source of truth, but asking a partner 
 
 ## 9. Known limitations, disclosed transparently in submission
 
-Decentralized-architecture limitations (§6) are listed in §6.5 — Stage 2, not Stage 3. Remaining ones:
+Decentralized-architecture limitations (§6) are listed in §6.5 — Stage 2, not Stage 3. §12's four additions have their own disclosed gaps inline (§12.2's unfunded USDC pool, §12.4's not-real-browser-tested MetaMask frontend). Remaining ones:
 
 - `settle` runs after the handler returns 200, matching the reference architecture's current behavior (acceptable for testnet).
 - Payment settlement is HBAR-on-Hedera only (`blocky402`, `PAY_TO_ACCOUNT`); multi-chain facilitator support (§7) needed for cross-border stablecoin fintech partners to pay in their own stablecoin isn't built yet — only the on-chain *evidence/scoring/lending* side is chain-agnostic-by-design so far (§6 intro), not yet the payment side.
@@ -228,7 +233,10 @@ Per the ecosystem-level implementation plan's §11: any code patterns reused fro
   dependency set (Reown AppKit/WalletKit) and needs a real browser + wallet
   extension to verify, neither of which was available to test in this
   session; the pasted-key approach reuses the exact signer already verified
-  working in `scripts/e2e-pay.ts`.
+  working in `scripts/e2e-pay.ts`. (Update 2026-07-30: a MetaMask option was
+  added alongside this as a second signing method — see §12.4 — using a
+  different mechanism than WalletConnect/HashPack, for reasons specific to
+  what MetaMask can and can't sign.)
 - **On-chain evidence**: static list of the verified contract addresses and
   transaction hashes from §6.
 - **`Buffer` polyfill** (`src/polyfills.ts`): the Hedera SDK references the
@@ -262,3 +270,171 @@ path at runtime (`src/chain/deployment.ts`), so the backend `Dockerfile`
 and `.dockerignore` had to be written carefully to include that one file
 while excluding the rest of the `contracts/` Hardhat workspace (its own
 `node_modules`, build artifacts, tests) from the backend image.
+
+## 12. Live oracles, second stablecoin, VBR self-input, MetaMask (2026-07-30)
+
+Four more features, added the same day after the frontend/deployment work
+above. Each is disclosed with exactly what's verified vs. what still needs
+a manual step, rather than glossing over the gaps.
+
+### 12.1 Live price oracles (Pyth + Supra) feeding DCS reasoning
+
+`src/chain/oracles.ts` implements `OracleProvider` for two real, independently
+verified Hedera testnet oracle networks -- confirmed live via direct RPC call
+before any code was written against them, not assumed from documentation:
+
+- **Pyth Network** -- contract `0xA2aa501b19aff244D90cc15a4Cf739D2725B5729`
+  (same address on Hedera mainnet and testnet), HBAR/USD feed id
+  `0x3728e591097635310e6341af53db8b7ee42da9b3a8d918f9463ce9cca886dfbd`,
+  read via `getPriceUnsafe()` (the last on-chain-cached update -- a fresh
+  pull requires fetching a signed VAA from Pyth's Hermes API and paying an
+  update fee in the same tx; Hedera's ecosystem already keeps this feed
+  fresh via other integrators).
+- **Supra Oracles** -- storage contract
+  `0x6Cd59830AAD978446e6cc7f6cc173aF7656Fb917`, HBAR/USDT pair index `75`,
+  read via `getSvalue()` (push oracle, no fee).
+- Both returned live, non-stale, **mutually consistent** prices (~$0.068,
+  within 0.5% of each other) when tested directly against the JSON-RPC
+  relay on 2026-07-30 -- see git history for the raw verification output.
+
+Wired into the ICM pipeline via the same injected-interface pattern as
+`ChainReader`/`ChainWriter` (`OracleReader` in `src/core/icm/types.ts`):
+`01-intake/` fetches the quote, `02-cross-check/` flags a missing or
+>1-hour-stale price as an evidence-quality issue, `03-reasoning/` uses it to
+normalize HBAR turnover into USD in the rationale trace, and `05-attest/`
+uses it to convert the credit limit from HBAR-tinybars into real stablecoin
+units -- **this replaces the "1:1 raw units, not real FX" simplification
+flagged in §6.4 and §9** with an actual price conversion. A conservative
+fallback price (`FALLBACK_HBAR_USD_PRICE = 0.03`, deliberately below market)
+is used only if both oracle reads fail, so a pricing outage under-extends
+credit rather than over-extends it.
+
+Selectable per-request via `?oracle=pyth|supra` on `dcs-score`/`credit-limit`
+(default `pyth`), and via a dropdown in the frontend's "Try it live" panel.
+**Live-verified 2026-07-30**: paid `credit-limit` calls for `biz-alice-mboga`
+with each oracle explicitly selected both succeeded, returned consistent
+(same evidence, ~0.5%-different price) limits, and both wrote real
+`DCSRegistry` attestations independently confirmed via the mirror node.
+
+### 12.2 Second `CreditLine`, backed by real Hedera testnet USDC
+
+**`CreditLine` (USDC)** -- `0x2C0f812DCA31CCa20d5e8324B88Eb6d9769E1B56`
+(`contracts/scripts/deploy-usdc-creditline.ts`), constructed against the same
+`DCSRegistry` as the zUSD `CreditLine`, but disbursing real Circle-issued
+Hedera testnet USDC (HTS token `0.0.429274`, EVM long-zero address
+`0x0000000000000000000000000000000000068cda`) instead of `MockStablecoin`.
+Selectable via `?stablecoin=zusd|usdc` on `credit-limit` (`src/chain/client.ts`'s
+`readCreditLine` picks which deployed instance to read) and a frontend
+dropdown. Since both instances read the same `DCSRegistry` attestation, the
+*computed limit* is identical either way -- the selector picks which
+contract a wallet would actually `draw()` from, not a different number.
+
+**Known gap, disclosed transparently: this pool is unfunded.** Getting it
+funded needs two things neither of which could be completed
+non-interactively in this session:
+1. **A token association.** Hedera requires an explicit association before
+   any account -- including a smart contract -- can hold an HTS token
+   (unlike a plain ERC20 like `MockStablecoin`, which needs no such step).
+   The `CreditLine` contract itself would need this, which typically means
+   either redeploying via the native Hedera SDK with
+   `setMaxAutomaticTokenAssociations` set, or adding an HTS-precompile
+   `associateToken` call into the contract -- neither done here.
+2. **An actual faucet claim.** Circle's public testnet faucet
+   (faucet.circle.com, confirmed to support Hedera testnet, 10 USDC per
+   request) is a browser-only UI with no documented API -- there's no
+   headless browser available in this session to drive it.
+
+So `draw()` against the USDC `CreditLine` will revert until a human
+completes both steps by hand (send some testnet USDC to
+`0x11A7727b237d2DF9466F4Cfa57b4c337da4Ee6ED` / `0.0.9671159` after
+associating; see `contracts/scripts/deploy-usdc-creditline.ts`'s header
+comment). The zUSD `CreditLine` remains the fully-funded, fully-demoable
+path.
+
+### 12.3 VBR self-input: user-submitted evidence, attested on-chain, dynamic recalculation
+
+`POST /vbr-input` (free, not x402-gated -- this is the business submitting
+evidence *to* Zacca, the opposite value-flow direction from the priced GET
+endpoints) takes `{businessId, businessName, yearsInBusiness, sector}` and
+writes it to `VBRRegistry` via `src/chain/client.ts`'s new `writeVbrClaim()`.
+
+**Trust model, deliberately not self-attestation:** the submitting wallet
+does not sign or write the attestation itself. Zacca's backend (the same
+allowlisted attestor as DCS attestations) attests on the submitter's behalf
+-- letting a wallet self-attest its own "verified" record would defeat the
+point of verification (anyone could claim anything). This matches the
+Stage 2 trust model already documented in §6.5: a small attestor set, not a
+quorum, but *an* attestor, not the claimant. The submitted fields are stored
+directly on-chain in `extra` (`abi.encode(businessName, yearsInBusiness,
+sector)`), not just a hash pointing at an off-chain record, and `claimHash`
+covers the full submitted payload (including a timestamp) for audit
+purposes. `vbr-lookup` decodes and returns this claim (`decodeVbrClaim` in
+`decentralized-credit-provider.ts`).
+
+**Live-verified 2026-07-30, dynamic adjustment demonstrated end-to-end**:
+submitted VBR data for a brand-new `businessId` with zero prior evidence
+(`biz-test-vbr-input`) -- confirmed the attestation transaction on the
+mirror node (`error_message: null`, correct `VBRRegistry` recipient) --
+then immediately paid for `credit-limit` on that same business id: DCS went
+from "no evidence on file" to a real score (`dcs: 50`, tier C, "moderate"
+evidence quality), with a $0 credit limit because there's still no
+Statement (cash-flow) attestation for it -- exactly the expected, honest
+behavior: VBR alone establishes identity, not repayment capacity.
+
+Frontend: `src/components/VbrInput.tsx`, a form that POSTs the claim and
+then points the user back to "Try it live" to re-run `dcs-score`/
+`credit-limit` against the business id they just attested.
+
+### 12.4 MetaMask / EVM-wallet payment path
+
+MetaMask (and any standard EIP-1193 wallet) cannot produce the payment the
+x402 "exact" Hedera scheme expects: that scheme verifies a native Hedera
+`TransferTransaction` (Hedera's own protobuf format, parsed via
+`@hiero-ledger/sdk`), and MetaMask only ever signs standard Ethereum-style
+transactions. Rather than force-fitting this into the existing x402
+header/402-challenge flow, `src/server/evm-payment.ts` implements a
+**parallel, purpose-built verification path**, documented as such rather
+than presented as a literal x402 scheme extension:
+
+- Hedera's EVM JSON-RPC relay accepts a plain `eth_sendTransaction` with a
+  `value` field as a genuine native HBAR transfer -- it settles as a real
+  `CRYPTOTRANSFER`, exactly like any other Hedera transfer, just addressed
+  via the account's deterministic long-zero EVM address
+  (`hederaAccountIdToEvmAddress`: `"0.0.X"` -> `0x` + `X` in hex, zero-padded
+  to 20 bytes -- unit-tested in `test/evm-payment.test.ts`).
+- A request with `?txHash=<hash>` on `/data/:productId` (checked *before*
+  the x402 `paymentMiddleware`, so it never also demands a native Hedera
+  payment header) triggers `verifyEvmPayment()`: fetches the transaction and
+  its receipt via the same JSON-RPC provider, checks `status === 1`, checks
+  `to` matches `PAY_TO_ACCOUNT`'s long-zero address, checks
+  `value >= priceTinybars * 10^10` (1 tinybar = 10^10 weibar, matching
+  Hedera's EVM value-unit convention), and checks the tx hash hasn't been
+  used before (in-memory replay-protection `Set` -- adequate for a
+  single-process testnet demo, not a production design).
+
+**Backend live-verified 2026-07-30 with a real on-chain transaction**: sent
+a plain value transfer via `ethers.Wallet.sendTransaction()` (exactly what
+MetaMask would produce under the hood) from the existing ECDSA deployer key
+to `PAY_TO_ACCOUNT`'s computed EVM address, confirmed `status: 1` on receipt,
+then called `/data/dcs-score?...&txHash=<hash>` -- got back a full scored
+response (200, real ICM pipeline run, real `DCSRegistry` write). A second
+call with the *same* hash was correctly rejected (402,
+`"Transaction already used to pay for a resource"`). Both the payment tx and
+the resulting DCS attestation tx were independently confirmed via the mirror
+node.
+
+**Frontend (`src/lib/metamaskPay.ts`, wired into `TryItLive.tsx` as a second
+"Sign with" option): built and compiles, but not tested against a real
+MetaMask browser extension** -- no real browser was available in this
+session to click through the actual wallet-connect/network-switch/signing
+UX. The implementation follows the standard EIP-1193 pattern used by every
+MetaMask-compatible wallet (`eth_requestAccounts` ->
+`wallet_switchEthereumChain`/`wallet_addEthereumChain` for Hedera testnet,
+chain id 296 -> `eth_sendTransaction` -> poll `eth_getTransactionReceipt` ->
+call the backend with the resulting hash), and the backend half of that
+exact flow is the part that's been proven live above -- but the actual
+click-through UX (does MetaMask's chain-add dialog look right, does the
+user get a sensible error if they reject the transaction, etc.) has not
+been exercised. Treat this as "should work, unverified in a real wallet"
+rather than "verified," and test it in a real browser before relying on it
+for a demo video.

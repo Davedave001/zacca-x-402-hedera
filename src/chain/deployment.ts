@@ -15,6 +15,9 @@ export interface DeploymentRecord {
     DCSRegistry: string;
     MockStablecoin: string;
     CreditLine: string;
+    /** USDC-backed CreditLine (Circle testnet USDC, HTS token 0.0.429274) -- unfunded until manually associated + faucet-funded, see DEPLOY.md. */
+    CreditLineUsdc?: string;
+    UsdcToken?: string;
   };
 }
 

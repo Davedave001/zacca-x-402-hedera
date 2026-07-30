@@ -14,7 +14,12 @@ by the time Stage 3 lands. Only the shape of the attestation (claim hash +
 expiry + optional structured `extra`) is assumed.
 
 **Output required:** an `IntakeResult` — whether a valid VBR attestation
-exists, whether a valid Statement attestation exists, and the decoded
+exists, whether a valid Statement attestation exists, the decoded
 aggregate cash-flow stats from the Statement attestation's `extra` field
-(period start/end, monthly turnover) if present. No scoring, no judgment
-calls — this stage only fetches and decodes.
+(period start/end, monthly turnover) if present, and a live HBAR/USD
+`OracleQuote` (provider, price, publish time) from the injected
+`OracleReader` (src/chain/oracles.ts -- a real, selectable oracle network:
+Pyth or Supra, both live on Hedera testnet). The oracle price is what lets
+Stage 05 convert HBAR-denominated turnover into real stablecoin value
+instead of a 1:1 raw-unit assumption. No scoring, no judgment calls — this
+stage only fetches and decodes.

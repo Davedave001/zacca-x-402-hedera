@@ -1,7 +1,10 @@
-import { Contract, JsonRpcProvider, Wallet } from "ethers";
+import { AbiCoder, Contract, JsonRpcProvider, Wallet, keccak256, toUtf8Bytes } from "ethers";
 import type { AttestationView, ChainReader, ChainWriter } from "../core/icm/types.js";
 import { ATTESTATION_REGISTRY_ABI, CREDIT_LINE_ABI, MOCK_STABLECOIN_ABI } from "./abis.js";
 import { loadDeployment } from "./deployment.js";
+
+const abiCoder = AbiCoder.defaultAbiCoder();
+const VBR_INPUT_TTL_SECONDS = 90 * 24 * 60 * 60; // 90 days, matches seed-demo-business.ts
 
 const RPC_URL = process.env.HEDERA_JSON_RPC_URL ?? "https://testnet.hashio.io/api";
 
@@ -68,12 +71,29 @@ export class HederaContractChainClient implements ChainReader, ChainWriter {
     return { transactionHash: receipt.hash };
   }
 
-  /** Reads the on-chain CreditLine decision -- computed by the contract, not re-derived here. */
-  async readCreditLine(businessId: string): Promise<{ limitTinybars: bigint; maxTenureMonths: number } | null> {
-    const creditLine = new Contract(this.deployment.contracts.CreditLine, CREDIT_LINE_ABI, provider());
+  /**
+   * Reads the on-chain CreditLine decision -- computed by the contract, not
+   * re-derived here. `stablecoin` selects which deployed CreditLine instance
+   * to read (both share the same DCSRegistry, so the limit itself is
+   * identical either way -- this selects which contract a wallet would
+   * actually draw() from). "usdc" falls back to null if that instance
+   * hasn't been deployed yet (see contracts/scripts/deploy-usdc-creditline.ts).
+   */
+  async readCreditLine(
+    businessId: string,
+    stablecoin: "zusd" | "usdc" = "zusd",
+  ): Promise<{ limitStablecoinUnits: bigint; maxTenureMonths: number; contractAddress: string; stablecoin: string } | null> {
+    const contractAddress = stablecoin === "usdc" ? this.deployment.contracts.CreditLineUsdc : this.deployment.contracts.CreditLine;
+    if (!contractAddress) return null;
+    const creditLine = new Contract(contractAddress, CREDIT_LINE_ABI, provider());
     try {
-      const [limitTinybars, maxTenureMonths] = await creditLine.getFunction("creditLimit")(businessId);
-      return { limitTinybars: BigInt(limitTinybars), maxTenureMonths: Number(maxTenureMonths) };
+      const [limitStablecoinUnits, maxTenureMonths] = await creditLine.getFunction("creditLimit")(businessId);
+      return {
+        limitStablecoinUnits: BigInt(limitStablecoinUnits),
+        maxTenureMonths: Number(maxTenureMonths),
+        contractAddress,
+        stablecoin: stablecoin === "usdc" ? "USDC" : "zUSD",
+      };
     } catch {
       return null; // no valid DCS attestation yet
     }
@@ -82,5 +102,33 @@ export class HederaContractChainClient implements ChainReader, ChainWriter {
   async stablecoinSymbol(): Promise<string> {
     const stablecoin = new Contract(this.deployment.contracts.MockStablecoin, MOCK_STABLECOIN_ABI, provider());
     return stablecoin.getFunction("symbol")();
+  }
+
+  /**
+   * Writes a user-submitted VBR claim to VBRRegistry, attested by Zacca's
+   * backend (same attestor key as attestDcs -- Stage 2 trust model, plan
+   * §6.5: the backend attests, the wallet doesn't self-attest, since an
+   * unreviewed self-attestation isn't "verified" evidence). The claim's
+   * business fields are stored directly on-chain in `extra` (not just a
+   * hash), and `claimHash` covers the full submitted payload including a
+   * timestamp, for audit purposes.
+   */
+  async writeVbrClaim(
+    businessId: string,
+    businessName: string,
+    yearsInBusiness: number,
+    sector: string,
+  ): Promise<{ transactionHash: string }> {
+    const submittedAt = Math.floor(Date.now() / 1000);
+    const claimHash = keccak256(
+      toUtf8Bytes(JSON.stringify({ businessId, businessName, yearsInBusiness, sector, submittedAt })),
+    );
+    const extra = abiCoder.encode(["string", "uint16", "string"], [businessName, yearsInBusiness, sector]);
+    const expiresAt = submittedAt + VBR_INPUT_TTL_SECONDS;
+
+    const registry = attestationRegistry(this.deployment.contracts.VBRRegistry, true);
+    const tx = await registry.getFunction("attest")(businessId, claimHash, expiresAt, extra);
+    const receipt = await tx.wait();
+    return { transactionHash: receipt.hash };
   }
 }

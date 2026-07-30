@@ -22,6 +22,8 @@ import {
   requireParams,
   requireProduct,
 } from "../core/provider.js";
+import { HederaContractChainClient } from "../chain/client.js";
+import { EvmPaymentError, verifyEvmPayment } from "./evm-payment.js";
 import type { ServerConfig } from "./config.js";
 
 /** Catalog document served at GET /catalog. */
@@ -108,7 +110,7 @@ export function createApp(
     "*",
     cors({
       origin: config.corsOrigins,
-      allowMethods: ["GET", "OPTIONS"],
+      allowMethods: ["GET", "POST", "OPTIONS"],
       allowHeaders: ["Content-Type", "PAYMENT-SIGNATURE", "X-PAYMENT"],
       exposeHeaders: ["PAYMENT-REQUIRED", "PAYMENT-RESPONSE", "X-PAYMENT-RESPONSE"],
     }),
@@ -116,6 +118,45 @@ export function createApp(
 
   app.get("/health", (c) => c.json({ status: "ok", provider: provider.name }));
   app.get("/catalog", (c) => c.json(buildCatalog(provider, config)));
+
+  // Free (not x402-gated) -- this is the business submitting their own
+  // evidence to Zacca, the opposite value-flow direction from the priced
+  // GET endpoints. Zacca's backend reviews and attests on their behalf
+  // (VBRRegistry's allowlisted-attestor model, plan §6.5) rather than
+  // letting the wallet self-attest, which wouldn't be "verified" evidence.
+  const vbrChain = new HederaContractChainClient();
+  app.post("/vbr-input", async (c) => {
+    let payload: Record<string, unknown>;
+    try {
+      payload = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400);
+    }
+    const businessId = typeof payload.businessId === "string" ? payload.businessId.trim() : "";
+    const businessName = typeof payload.businessName === "string" ? payload.businessName.trim() : "";
+    if (!businessId || !businessName) {
+      return c.json({ error: "businessId and businessName are required" }, 400);
+    }
+    const yearsInBusiness =
+      typeof payload.yearsInBusiness === "number" && Number.isFinite(payload.yearsInBusiness)
+        ? Math.max(0, Math.min(65535, Math.round(payload.yearsInBusiness)))
+        : 0;
+    const sector = typeof payload.sector === "string" ? payload.sector.trim() : "unspecified";
+
+    try {
+      const receipt = await vbrChain.writeVbrClaim(businessId, businessName, yearsInBusiness, sector);
+      return c.json({
+        businessId,
+        businessName,
+        yearsInBusiness,
+        sector,
+        onChain: receipt,
+        note: "Re-run dcs-score/credit-limit for this businessId to see the credit limit recalculated against this new VBR evidence.",
+      });
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  });
 
   // Pre-validation: reject unknown products / missing params before payment.
   app.use("/data/:productId", async (c, next) => {
@@ -129,6 +170,36 @@ export function createApp(
       throw err;
     }
     await next();
+  });
+
+  // MetaMask/EVM-wallet payment path: a plain eth_sendTransaction HBAR
+  // transfer verified by receipt, instead of the native Hedera
+  // TransferTransaction the x402 "exact" Hedera scheme below expects.
+  // Triggered only by the presence of ?txHash= -- see src/server/evm-payment.ts
+  // for why this is a parallel path, not a literal x402 scheme extension.
+  // Runs before paymentMiddleware so a txHash request never also gets asked
+  // for a native Hedera payment header.
+  app.use("/data/:productId", async (c, next) => {
+    const txHash = c.req.query("txHash");
+    if (!txHash) return next();
+
+    const product = requireProduct(provider, c.req.param("productId"));
+    try {
+      await verifyEvmPayment(txHash, BigInt(product.priceTinybars), config.payToAccount);
+    } catch (err) {
+      const message = err instanceof EvmPaymentError ? err.message : err instanceof Error ? err.message : String(err);
+      return c.json({ error: "evm_payment_verification_failed", reason: message }, 402);
+    }
+
+    try {
+      const body = await provider.fetch(c.req.param("productId"), c.req.query());
+      return c.json(body);
+    } catch (err) {
+      if (err instanceof ProviderRequestError) {
+        return c.json({ error: err.message }, err.status as 400 | 404);
+      }
+      throw err;
+    }
   });
 
   if (withPayments) {

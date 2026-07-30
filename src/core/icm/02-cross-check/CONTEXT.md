@@ -9,5 +9,7 @@ gathered.
 **Output required:** a `CrossCheckResult` -- an `evidenceQuality` tier
 (`strong` / `moderate` / `weak`) and a list of human-readable `flags`
 describing any inconsistency found (e.g. a VBR record with no statement
-evidence, or a statement with implausibly low turnover). No score, no risk
-tier -- this stage only assesses evidence quality for Stage 03 to weigh.
+evidence, a statement with implausibly low turnover, or a missing/stale
+oracle price -- see `IntakeResult.oracle`, which the eventual USD-normalized
+credit limit depends on). No score, no risk tier -- this stage only
+assesses evidence quality for Stage 03 to weigh.

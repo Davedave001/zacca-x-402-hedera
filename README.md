@@ -119,6 +119,40 @@ node (not just trusted from script output):
 Full addresses, transaction hashes, and mirror-node confirmations are in
 `IMPLEMENTATION_PLAN.md` §6.
 
+## Live oracles, a second stablecoin, VBR self-input, MetaMask (2026-07-30)
+
+Four more features on top of the above, each live-verified with real
+on-chain transactions unless noted — full detail, addresses, and exact
+verification steps in `IMPLEMENTATION_PLAN.md` §12:
+
+- **Live price oracles** — Pyth Network and Supra Oracles, both real,
+  independently-confirmed Hedera testnet deployments (not simulated), feed
+  a live HBAR/USD price into the ICM reasoning pipeline and the
+  credit-limit computation — replacing the old "1:1 raw units" FX
+  simplification with an actual conversion. Selectable via `?oracle=pyth|supra`
+  or a frontend dropdown.
+- **A second `CreditLine`**, backed by real Hedera testnet USDC (Circle's
+  HTS token `0.0.429274`) instead of the zUSD `MockStablecoin`, selectable
+  via `?stablecoin=zusd|usdc` or a frontend dropdown. **Known gap:** this
+  pool is unfunded — funding it needs a token association and an actual
+  Circle testnet-USDC faucet claim, both of which need a real browser
+  (faucet.circle.com has no API); the zUSD `CreditLine` remains the fully
+  funded, fully demoable path.
+- **VBR self-input** (`POST /vbr-input` + a frontend form): submit your own
+  business evidence, attested on-chain by Zacca's backend (not a
+  self-attestation — see §12.3 for why), with `dcs-score`/`credit-limit`
+  immediately reflecting it. Verified live: a brand-new business id went
+  from "no evidence on file" to a real DCS score after submission.
+- **MetaMask payment path**: MetaMask can't sign the native Hedera
+  transaction the main x402 flow uses, so `src/server/evm-payment.ts`
+  verifies payment via a plain HBAR value transfer + transaction receipt
+  instead — a parallel path, not a literal x402 scheme extension. The
+  backend half is live-verified with a real on-chain transaction (see §12.4);
+  the frontend half (`src/lib/metamaskPay.ts`) is built and compiles but
+  has **not been tested against a real MetaMask browser extension** — no
+  headless browser was available in this session. Treat it as
+  "should work, unverified in a real wallet."
+
 ## Architecture
 
 - `src/core/provider.ts` — the `DataProvider` contract (unchanged from reference)
@@ -226,11 +260,18 @@ submission and the Q3 2026 product milestone are the same artifact.
   are reachable today.
 - **`settle` runs after the handler returns 200**, matching the reference
   architecture's behavior (acceptable for testnet).
-- **Credit-limit units are a known simplification** — applied 1:1 as raw zUSD
-  token units rather than converted through an actual HBAR-to-USD exchange
-  rate. Fine for proving the mechanism; a real deployment needs a real price
-  feed.
-- **Payment settlement is HBAR-on-Hedera only** — multi-chain facilitator
-  support for partner fintechs paying in their own stablecoin isn't built.
+- **Credit-limit FX conversion now uses a real oracle price** (Pyth or Supra,
+  see above) instead of the old 1:1 raw-unit simplification — but falls back
+  to a conservative static price if both oracles are unreachable.
+- **The USDC-backed `CreditLine` pool is unfunded** — needs a token
+  association and a real testnet-USDC faucet claim, both browser-only steps.
+  See the section above.
+- **The MetaMask frontend flow hasn't been tested in a real browser/wallet
+  extension** — the backend verification it depends on has been, with a
+  real on-chain transaction. See the section above.
+- **Payment settlement is HBAR-on-Hedera only** for the main x402 flow —
+  multi-chain facilitator support for partner fintechs paying in their own
+  stablecoin isn't built (the MetaMask path is a same-chain, alternate
+  *signing method*, not multi-chain payment support).
 - **No partner-facing SDKs, API docs, or x402-gated disbursement endpoint
   yet** — see `IMPLEMENTATION_PLAN.md` §7.

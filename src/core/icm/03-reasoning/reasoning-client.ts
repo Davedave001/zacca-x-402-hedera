@@ -51,6 +51,12 @@ export class StubReasoningClient implements ReasoningClient {
       rationale.push(
         `Statement reports monthly turnover of ${turnover.toString()} tinybars -> turnover bonus +${turnoverBonus}.`,
       );
+      if (intake.oracle) {
+        const usdTurnover = (Number(turnover) / 1e8) * intake.oracle.price;
+        rationale.push(
+          `Normalized via ${intake.oracle.provider} ${intake.oracle.pair} @ $${intake.oracle.price.toFixed(5)} (${intake.oracle.ageSeconds}s old) -> approx. $${usdTurnover.toFixed(2)}/month USD-equivalent turnover.`,
+        );
+      }
     } else {
       rationale.push("No statement attestation -> no cash-flow bonus applied.");
     }
