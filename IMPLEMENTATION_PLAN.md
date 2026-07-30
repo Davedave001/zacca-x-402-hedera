@@ -45,10 +45,12 @@ Two on-chain identities are involved, for a Hedera-specific reason worth knowing
 | `src/providers/decentralized/` (`DecentralizedCreditProvider`, now the default `DATA_PROVIDER`) | **Built, live-verified against all 3 endpoints 2026-07-21** |
 | Demo business seeded on-chain (`biz-alice-mboga`: VBR + Statement attestations, linked CreditLine wallet) | **Done 2026-07-21** — `scripts/seed-demo-business.ts` |
 | Live stablecoin draw against `CreditLine` (§6.4 payoff) | **Done, verified on mirror node 2026-07-21** — `scripts/demo-draw.ts`, 10 zUSD disbursed |
+| `frontend/` (Vite/React landing page + live in-browser pay demo, for `pay.zacca.ai`) | **Built 2026-07-30** — CORS added to backend for it |
+| `Dockerfile` (backend) / `frontend/Dockerfile` / `docker-compose.yml` / `DEPLOY.md` | **Built and locally smoke-tested 2026-07-30** — both images build, both containers run, CORS/402 flow verified end-to-end via curl; actual Coolify/Hostinger deploy still pending (needs DNS + Coolify UI steps only I can't do) |
 | Demo video (<5 min) | **Not yet recorded** |
 | Submission form | **Not yet submitted** |
 
-Net: Step 0–3 of the original bounty-scoped checklist (§8) are done, and the scope itself expanded partway through: rather than shipping Stage 1 alone and treating decentralization as a post-bounty roadmap, §6 was built and deployed for this submission. The blocking path now is Step 4–5 (demo video, submit).
+Net: Step 0–3 of the original bounty-scoped checklist (§8) are done, and the scope itself expanded partway through: rather than shipping Stage 1 alone and treating decentralization as a post-bounty roadmap, §6 was built and deployed for this submission, and a real frontend + Docker/Coolify deployment path was added afterward (§11). The blocking path now is Step 4–5 (demo video, submit) plus the actual Coolify deploy.
 
 ## 3. Product catalog (as designed)
 
@@ -210,3 +212,53 @@ Decentralized-architecture limitations (§6) are listed in §6.5 — Stage 2, no
 Per the ecosystem-level implementation plan's §11: any code patterns reused from prior collaborations must be cleanly separated/re-implemented before shipping under the Zacca name. This repo forks a third-party bounty reference (`matevszm/x402-hedera-example`) for the x402/Hedera plumbing only; `CreditScoreProvider`/`dcs-scoring.ts` (Stage 1), and everything in §6 (`contracts/`, `src/core/icm/`, `src/chain/`, `src/providers/decentralized/`) are original Zacca logic and are the actual submission asset.
 
 **License check (2026-07-21):** verified via the GitHub API — `matevszm/x402-hedera-example` has **no LICENSE file** (`license: null`), so the earlier "MIT-style" assumption in this doc was wrong; default copyright applies. Decision: proceed without adding a LICENSE file or attribution note, on the basis that the repo was published as a bounty reference architecture explicitly meant to be forked by contestants. Revisit if this submission is ever repurposed commercially beyond the bounty. (`contracts/` has its own `package.json`, MIT-licensed, using `@openzeppelin/contracts` — also MIT — for `ERC20`/`Ownable`; no license ambiguity there.)
+
+## 11. Frontend & Coolify/Hostinger deployment (2026-07-30)
+
+`frontend/` (Vite + React + TypeScript) was added after the fact, for a live
+`pay.zacca.ai` deployment alongside `pay-api.zacca.ai`:
+
+- **Landing page**: hero, numbered "how it works" sections, and a live
+  `GET /catalog` fetch — nothing hardcoded.
+- **"Try it live"**: runs the actual `402 -> sign -> pay -> 200` round trip
+  in the browser. Signing uses a pasted Hedera testnet private key
+  (`src/lib/payClient.ts`, browser-local only, never transmitted) rather
+  than a full HashPack/WalletConnect integration — a deliberate scope
+  tradeoff: WalletConnect's Hedera integration pulls in a heavy peer
+  dependency set (Reown AppKit/WalletKit) and needs a real browser + wallet
+  extension to verify, neither of which was available to test in this
+  session; the pasted-key approach reuses the exact signer already verified
+  working in `scripts/e2e-pay.ts`.
+- **On-chain evidence**: static list of the verified contract addresses and
+  transaction hashes from §6.
+- **`Buffer` polyfill** (`src/polyfills.ts`): the Hedera SDK references the
+  bare Node global `Buffer` in a few code paths that don't get bundled
+  automatically — found by inspecting the production bundle output
+  (`grep -o "Buffer\.[a-zA-Z]*(" dist/assets/*.js`), not by running it in an
+  actual browser (none available here). Fixed with an explicit
+  `window.Buffer` shim from the `buffer` npm package.
+
+**Backend changes for this:** CORS (`hono/cors`) added to `src/server/app.ts`,
+configurable via `CORS_ORIGIN` (`src/server/config.ts`), exposing the
+x402-specific headers (`PAYMENT-REQUIRED`, `PAYMENT-RESPONSE`,
+`X-PAYMENT-RESPONSE`) the browser needs to read. Also fixed a latent bug
+found while touching `config.ts`: the `DATA_PROVIDER` env-var fallback still
+said `"zacca-credit"`, silently overriding the intended `"zacca-decentralized"`
+default from `src/providers/index.ts` whenever `DATA_PROVIDER` was unset.
+
+**Deployment:** two Coolify resources, one Dockerfile each (`Dockerfile` at
+repo root for the backend, `frontend/Dockerfile` for the frontend), full
+click-through steps in `DEPLOY.md`. Both images were built and run locally
+via `docker compose up --build` and verified end-to-end with curl: catalog
+fetch, CORS preflight, actual CORS'd GET, and the 402 challenge all worked
+correctly across the two containers. The actual Coolify/Hostinger VPS
+deploy itself (DNS, clicking through the Coolify UI, TLS issuance) was not
+done in this session — no access to that panel — so it's the one part of
+this still unverified beyond the local Docker smoke test.
+
+Notable runtime dependency caught before it became a deploy-time bug: the
+backend reads `contracts/deployments/hederaTestnet.json` via a relative
+path at runtime (`src/chain/deployment.ts`), so the backend `Dockerfile`
+and `.dockerignore` had to be written carefully to include that one file
+while excluding the rest of the `contracts/` Hardhat workspace (its own
+`node_modules`, build artifacts, tests) from the backend image.

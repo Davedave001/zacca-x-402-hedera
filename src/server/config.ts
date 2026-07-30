@@ -10,6 +10,8 @@ export interface ServerConfig {
   /** Which DataProvider to serve. */
   dataProvider: string;
   port: number;
+  /** Allowed CORS origins for the browser frontend (pay.zacca.ai, local dev). */
+  corsOrigins: string[];
 }
 
 export function loadServerConfig(env = process.env): ServerConfig {
@@ -23,7 +25,11 @@ export function loadServerConfig(env = process.env): ServerConfig {
     network: env.HEDERA_NETWORK ?? "hedera:testnet",
     facilitatorUrl: env.FACILITATOR_URL ?? "https://api.testnet.blocky402.com",
     payToAccount,
-    dataProvider: env.DATA_PROVIDER ?? "zacca-credit",
+    dataProvider: env.DATA_PROVIDER ?? "zacca-decentralized",
     port: Number(env.PORT ?? 4021),
+    corsOrigins: (env.CORS_ORIGIN ?? "https://pay.zacca.ai,http://localhost:5173")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
   };
 }

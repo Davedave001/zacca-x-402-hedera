@@ -6,6 +6,7 @@
  * issuing a 402 — nobody pays for an error.
  */
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { paymentMiddleware, x402ResourceServer } from "@x402/hono";
 import {
   HTTPFacilitatorClient,
@@ -99,6 +100,19 @@ export function createApp(
 ): Hono {
   const { withPayments = true } = options;
   const app = new Hono();
+
+  // Lets the browser frontend (pay.zacca.ai) call this API directly, including
+  // reading/sending the x402 payment challenge/signature/settlement headers,
+  // which aren't part of the CORS-safelisted header set by default.
+  app.use(
+    "*",
+    cors({
+      origin: config.corsOrigins,
+      allowMethods: ["GET", "OPTIONS"],
+      allowHeaders: ["Content-Type", "PAYMENT-SIGNATURE", "X-PAYMENT"],
+      exposeHeaders: ["PAYMENT-REQUIRED", "PAYMENT-RESPONSE", "X-PAYMENT-RESPONSE"],
+    }),
+  );
 
   app.get("/health", (c) => c.json({ status: "ok", provider: provider.name }));
   app.get("/catalog", (c) => c.json(buildCatalog(provider, config)));

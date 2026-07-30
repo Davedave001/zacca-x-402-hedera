@@ -132,9 +132,29 @@ Full addresses, transaction hashes, and mirror-node confirmations are in
 - `scripts/e2e-pay.ts` — live client running the full `402 -> pay -> 200` flow against any product (`E2E_PRODUCT`)
 - `scripts/seed-demo-business.ts` / `scripts/demo-draw.ts` — seed on-chain evidence and demo a stablecoin draw
 - `contracts/` — separate Hardhat workspace; see `contracts/README.md`
+- `frontend/` — Vite/React landing page + live demo (`pay.zacca.ai`); see `frontend/README.md`
 
 Swap data source: one line in `src/providers/index.ts` (`DATA_PROVIDER=zacca-decentralized` (default) vs `zacca-credit` vs `mock`).
 Swap facilitator: change `FACILITATOR_URL`.
+
+## Frontend & deployment
+
+`frontend/` is a small Vite/React app: a landing page explaining the product,
+a live `GET /catalog` display, an in-browser "try it live" panel that runs
+the real `402 -> sign -> pay -> 200` flow against a pasted testnet key
+(never leaves the browser), and a static list of verified on-chain evidence.
+The backend's CORS is configured (`CORS_ORIGIN`, `src/server/app.ts`) so this
+frontend can call it directly from a different domain.
+
+Both pieces have their own Dockerfile (`Dockerfile` at repo root for the
+backend, `frontend/Dockerfile` for the frontend) and are meant to deploy as
+two separate Coolify resources -- `pay-api.zacca.ai` and `pay.zacca.ai`.
+Full step-by-step deploy instructions, required env vars, and gotchas
+(CORS origin matching, `VITE_API_BASE_URL` being a build-time arg, the
+backend needing `contracts/deployments/hederaTestnet.json` at runtime) are
+in `DEPLOY.md`. Local smoke test: `docker compose up --build`, then
+`http://localhost:8080` (frontend) and `http://localhost:4021/catalog`
+(backend).
 
 ## Setup
 

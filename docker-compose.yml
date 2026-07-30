@@ -1,0 +1,27 @@
+# Local smoke test only -- Coolify deploys each service as its own resource
+# (see DEPLOY.md), not via this compose file. Mirrors that same two-container
+# shape (backend + frontend) so you can verify both images build and talk to
+# each other before deploying.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      # Local compose network origin for the frontend container below.
+      CORS_ORIGIN: http://localhost:8080,http://localhost:5173
+    ports:
+      - "4021:4021"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:4021
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend

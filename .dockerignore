@@ -1,0 +1,24 @@
+.git
+.env
+.env.example
+node_modules
+test
+*.log
+
+# frontend/ is its own Dockerfile with its own build context; never needed
+# in the backend image
+frontend
+
+# contracts/ -- only contracts/deployments/*.json is needed at runtime
+# (src/chain/deployment.ts). Everything else here is the Hardhat workspace:
+# its own node_modules, build artifacts, and tests, none of which the
+# backend runs.
+contracts/node_modules
+contracts/artifacts
+contracts/cache
+contracts/types
+contracts/test
+contracts/contracts
+contracts/scripts
+contracts/.env
+contracts/package-lock.json

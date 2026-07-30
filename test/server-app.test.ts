@@ -13,6 +13,7 @@ const config: ServerConfig = {
   payToAccount: "0.0.1234",
   dataProvider: "zacca-credit",
   port: 4021,
+  corsOrigins: ["http://localhost:5173"],
 };
 
 const provider = new CreditScoreProvider();
@@ -57,8 +58,9 @@ describe("loadServerConfig", () => {
     } as NodeJS.ProcessEnv);
     expect(cfg.network).toBe("hedera:testnet");
     expect(cfg.facilitatorUrl).toBe("https://api.testnet.blocky402.com");
-    expect(cfg.dataProvider).toBe("zacca-credit");
+    expect(cfg.dataProvider).toBe("zacca-decentralized");
     expect(cfg.port).toBe(4021);
+    expect(cfg.corsOrigins).toEqual(["https://pay.zacca.ai", "http://localhost:5173"]);
   });
 });
 
