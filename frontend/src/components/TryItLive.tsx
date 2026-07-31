@@ -36,15 +36,23 @@ export function TryItLive() {
   const [result, setResult] = useState<PayResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [payToAccount, setPayToAccount] = useState<string | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     fetch(`${API_BASE_URL}/catalog`)
-      .then((res) => res.json())
-      .then((json) => {
-        if (!cancelled && typeof json.payTo === "string") setPayToAccount(json.payTo);
+      .then((res) => {
+        if (!res.ok) throw new Error(`GET /catalog -> HTTP ${res.status}`);
+        return res.json();
       })
-      .catch(() => {});
+      .then((json) => {
+        if (cancelled) return;
+        if (typeof json.payTo === "string") setPayToAccount(json.payTo);
+        else throw new Error("GET /catalog response missing payTo");
+      })
+      .catch((err) => {
+        if (!cancelled) setCatalogError(err instanceof Error ? err.message : String(err));
+      });
     return () => {
       cancelled = true;
     };
@@ -138,6 +146,13 @@ export function TryItLive() {
           verifies it by inspecting the transaction receipt instead. You'll
           be prompted to add/switch to Hedera Testnet (chain id 296) if your
           wallet isn't on it already.
+        </div>
+      )}
+
+      {signMethod === "metamask" && catalogError && (
+        <div className="callout error">
+          Can't reach the API to fetch the payee account ({catalogError}) — the "Connect & Pay" button below stays
+          disabled until this succeeds. Reload the page once the API is back.
         </div>
       )}
 

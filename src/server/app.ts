@@ -107,12 +107,18 @@ export function createApp(
   // Lets the browser frontend (pay.zacca.ai) call this API directly, including
   // reading/sending the x402 payment challenge/signature/settlement headers,
   // which aren't part of the CORS-safelisted header set by default.
+  // "Access-Control-Expose-Headers" is allow-listed here (as a *request*
+  // header, not its usual response-header role) because @x402/fetch's
+  // wrapFetchWithPayment sets it directly on the outgoing paid request --
+  // if it's missing from allowHeaders, the browser's CORS preflight check
+  // rejects the whole request client-side before it ever reaches this
+  // server, surfacing as an opaque "Failed to fetch" in the browser.
   app.use(
     "*",
     cors({
       origin: config.corsOrigins,
       allowMethods: ["GET", "POST", "OPTIONS"],
-      allowHeaders: ["Content-Type", "PAYMENT-SIGNATURE", "X-PAYMENT"],
+      allowHeaders: ["Content-Type", "PAYMENT-SIGNATURE", "X-PAYMENT", "Access-Control-Expose-Headers"],
       exposeHeaders: ["PAYMENT-REQUIRED", "PAYMENT-RESPONSE", "X-PAYMENT-RESPONSE"],
     }),
   );

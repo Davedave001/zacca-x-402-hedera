@@ -125,4 +125,24 @@ describe("HTTP app (offline, payments disabled)", () => {
     const res = await app.request("/data/dcs-score");
     expect(res.status).toBe(400);
   });
+
+  it("CORS preflight allows the headers @x402/fetch actually sends on a paid retry", async () => {
+    // wrapFetchWithPayment (frontend/src/lib/payClient.ts) sets both X-PAYMENT
+    // and, unusually, "Access-Control-Expose-Headers" directly on the
+    // outgoing request. If either is missing from allowHeaders, the browser
+    // blocks the request client-side and it never reaches this server --
+    // regression test for that silent "Failed to fetch" failure mode.
+    const res = await app.request("/data/dcs-score", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:5173",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "x-payment,access-control-expose-headers",
+      },
+    });
+    expect(res.status).toBe(204);
+    const allowed = res.headers.get("access-control-allow-headers") ?? "";
+    expect(allowed.toLowerCase()).toContain("x-payment");
+    expect(allowed.toLowerCase()).toContain("access-control-expose-headers");
+  });
 });
