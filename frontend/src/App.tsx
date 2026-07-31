@@ -1,7 +1,7 @@
 import { Nav } from "./components/Nav";
 import { Hero } from "./components/Hero";
 import { HowItWorks } from "./components/HowItWorks";
-import { Catalog } from "./components/Catalog";
+import { Oracles } from "./components/Oracles";
 import { TryItLive } from "./components/TryItLive";
 import { VbrInput } from "./components/VbrInput";
 import { OnChainEvidence } from "./components/OnChainEvidence";
@@ -15,7 +15,7 @@ function App() {
         <div className="page-inner">
           <Hero />
           <HowItWorks />
-          <Catalog />
+          <Oracles />
           <TryItLive />
           <VbrInput />
           <OnChainEvidence />

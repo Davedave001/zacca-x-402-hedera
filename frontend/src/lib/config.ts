@@ -5,6 +5,8 @@ export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export const REPO_URL = "https://github.com/Davedave001/zacca-x-402-hedera";
 
+export const SDK_URL = "https://github.com/Davedave001/zacca-x-402-hedera/tree/master/sdk";
+
 export const DEFAULT_BUSINESS_ID = "biz-alice-mboga";
 
 export const HASHSCAN_TESTNET = "https://hashscan.io/testnet";
